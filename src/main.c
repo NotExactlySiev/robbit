@@ -9,7 +9,8 @@
 
 
 void the_rest(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size);
-void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size, u16 *texture, int tex_w, int tex_h);
+//void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size);
+void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size);
 Pipeline create_pipeline_points();
 Pipeline create_pipeline_normal();
 
@@ -60,27 +61,7 @@ int main(int argc, char **argv)
         ...
     };
 
-    int tri_count = sizeof tri_index_data / (3 * sizeof *tri_index_data);
-    int quad_count = sizeof quad_index_data / (4 * sizeof *quad_index_data);
 
-    int prim_count = tri_count + 2 * quad_count;
-    u16 index_data[prim_count][3];
-
-    for (int i = 0; i < tri_count; i++) {
-        index_data[i][0] = tri_index_data[3*i + 0] - 1;
-        index_data[i][1] = tri_index_data[3*i + 1] - 1;
-        index_data[i][2] = tri_index_data[3*i + 2] - 1;
-    }
-
-    for (int i = 0; i < quad_count; i++) {
-        int j = 2*i + tri_count;
-        index_data[j][0] = quad_index_data[4*i + 0] - 1;
-        index_data[j][1] = quad_index_data[4*i + 1] - 1;
-        index_data[j][2] = quad_index_data[4*i + 2] - 1;
-
-        index_data[j+1][0] = quad_index_data[4*i + 0] - 1;
-        index_data[j+1][1] = quad_index_data[4*i + 2] - 1;
-        index_data[j+1][2] = quad_index_data[4*i + 3] - 1;
     }*/
 
     
@@ -103,7 +84,7 @@ int main(int argc, char **argv)
     
     // find the objects list and level data nodes
     // just fucking terrible code
-    EarNode *objs_node = NULL;
+    /*EarNode *objs_node = NULL;
     for (EarNode *np = ear->nodes->sub + 4; np->type != EAR_NODE_TYPE_SEPARATOR; np++) {
         if (np->type == EAR_NODE_TYPE_DIR && aloha(np)->content == EAR_CONTENT_ENTITY) {
             objs_node = np;
@@ -161,7 +142,76 @@ int main(int argc, char **argv)
     printf("??? entities\n");
 
     AlohaMesh *house = &meshes_normal[66];
+    */
+
+    EarNode *kiwi_node = &ear->nodes->sub[1];
+
+    mesh_file_parse(kiwi_node->sub[2].buf, meshes_normal);
+    AlohaMesh *house = &meshes_normal[1];
     void *x = house->faces;
+
+    clut_data = aloha(kiwi_node)->model.mesh_clut->buf;
+
+    int nfaces = mesh_faces(NULL, house);
+    AlohaFace faces[nfaces];
+    printf("%d FACES\n");
+    mesh_faces(faces, house);
+    
+    //u16 index_data[2048][3];
+
+    int nprims = 0;
+
+    
+    /*for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
+        printf("%d %d %d %d\n", f->v0, f->v1, f->v2, f->v3);
+        index_data[nprims][0] = f->v0;
+        index_data[nprims][1] = f->v1;
+        index_data[nprims][2] = f->v2;
+        nprims++;
+        if (f->v3 != 0) {
+            index_data[nprims][0] = f->v0;
+            index_data[nprims][1] = f->v2;
+            index_data[nprims][2] = f->v3;
+            nprims++;
+        }
+    }*/
+
+    /*for (int i = 0; i < nprims; i++) {
+        printf("%d %d %d\n", index_data[i][0], index_data[i][1], index_data[i][2]);
+    }*/
+
+    // screw it, no drawindexed for you. make everything into verts
+
+    RobbitVertex vkverts[2048][3] = {0};
+
+    for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
+        //printf("%d %d %d %d\n", f->v0, f->v1, f->v2, f->v3);
+        bool tex = !(f->flags1 & 0x8000);
+        vkverts[nprims][0].pos = house->verts[f->v0];
+        vkverts[nprims][1].pos = house->verts[f->v1];
+        vkverts[nprims][2].pos = house->verts[f->v2];
+        
+        
+        if (!tex) {
+            vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
+            //vkverts[nprims][1].col = clut_data[f->flags0 >> 2];
+            //vkverts[nprims][2].col = clut_data[f->flags0 >> 2];
+        }
+        nprims++;
+
+        if (f->v3 != 0) {
+            vkverts[nprims][0].pos = house->verts[f->v0];
+            vkverts[nprims][1].pos = house->verts[f->v2];
+            vkverts[nprims][2].pos = house->verts[f->v3];
+            if (!tex) {
+                vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
+                //vkverts[nprims][1].col = clut_data[f->flags0 >> 2];
+                //vkverts[nprims][2].col = clut_data[f->flags0 >> 2];
+            }
+            nprims++;
+        }
+    }
+    
 
     const GLFWvidmode *mode;
     GLFWmonitor *monitor;
@@ -174,13 +224,25 @@ int main(int argc, char **argv)
     window = glfwCreateWindow(640, 480, "cool window", NULL, NULL);
 
     create_app(window);
+
     Pipeline points_pipe = create_pipeline_points();
+
+
+    // convert to the format vulkan likes
+    // TODO: should the conversion be a two step process? first flatten the mesh
+    // to one array of AlohaFace without groups/subgroups.
+    // then apply other adjustments from there (divide by 3 etc.)
+
+    
+
     Pipeline normal_pipe = create_pipeline_normal();
     
-    the_rest(&points_pipe, house->verts, house->nverts * sizeof(AlohaVertex), NULL, 0);
+    //the_rest(&normal_pipe, house->verts, house->nverts * sizeof(AlohaVertex), NULL, 0);
+    //the_rest_normal(&normal_pipe, house->verts, house->nverts * sizeof(AlohaVertex), index_data, 3*sizeof(u16)*nprims);
+    the_rest_normal(&normal_pipe, vkverts, 3 * nprims * sizeof(RobbitVertex));
 
     destroy_pipeline(points_pipe);
-    //destroy_pipeline(normal_pipe);
+    destroy_pipeline(normal_pipe);
     destroy_app();
 
     glfwDestroyWindow(window);

@@ -66,7 +66,6 @@ Color image_15_to_24(uint16_t col)
         .g = (0x1f & (col >> 5)) << 3,
         .b = (0x1f & (col >> 10)) << 3,
     };
-    //printf("converting %X, g = %d\n", col, ret.g);
     return ret;
 }
 

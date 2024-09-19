@@ -19,17 +19,25 @@ static VkPipelineVertexInputStateCreateInfo default_vertex_input_state  = {
     .vertexBindingDescriptionCount = 1,
     .pVertexBindingDescriptions = &(VkVertexInputBindingDescription) {
         .binding = 0,
-        .stride = sizeof(AlohaVertex),  // TODO: don't hardcode
+        .stride = sizeof(RobbitVertex),  // TODO: don't hardcode
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     },
     // TODO: we can have per polygon (per instance) color here!
     // this shouldn't be default, should it?
-    .vertexAttributeDescriptionCount = 1,
-    .pVertexAttributeDescriptions = &(VkVertexInputAttributeDescription) {
-        .binding = 0,
-        .location = 0,
-        .format = VK_FORMAT_R16G16B16_SNORM,
-        .offset = 0,
+    .vertexAttributeDescriptionCount = 2,
+    .pVertexAttributeDescriptions = (VkVertexInputAttributeDescription[]) {
+        {
+            .location = 0,
+            .binding = 0,
+            .format = VK_FORMAT_R16G16B16_SNORM,
+            .offset = 0,
+        },
+        {
+            .location = 1,
+            .binding = 0,
+            .format = VK_FORMAT_R8G8B8_UNORM,
+            .offset = offsetof(RobbitVertex, col),
+        },
     },
 };
 
@@ -38,6 +46,7 @@ VkPipelineRasterizationStateCreateInfo default_raster_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
     .polygonMode=VK_POLYGON_MODE_FILL,
     .cullMode=VK_CULL_MODE_BACK_BIT,
+    //.cullMode = VK_CULL_MODE_NONE,
     .frontFace=VK_FRONT_FACE_CLOCKWISE,
     .lineWidth = 1.0,
 };
@@ -289,14 +298,6 @@ Pipeline create_pipeline_normal(void)
         },
     }, NULL, &ret.set);
 
-
-    // should this part, updating of the desc sets, be part of the pipeline creation?
-    // can you update them after you've already created the pipeline? how does that
-    // work?
-    
-    /* DESCRIPTOR SETS WERE HERE. MOVING TO THE_REST */
-    //VkDescriptorSet desc_sets[max_frames];
-
     VkPipelineLayoutCreateInfo pipeline_layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = 1,
@@ -315,6 +316,11 @@ Pipeline create_pipeline_normal(void)
         .pRasterizationState = &default_raster_info,
         .pMultisampleState = &default_multisample_info,
         .pColorBlendState = &default_colorblend_info,
+        .pDepthStencilState = &(VkPipelineDepthStencilStateCreateInfo) {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .depthTestEnable = VK_TRUE,
+            .depthWriteEnable = VK_TRUE,
+        },
         .layout = ret.layout,
         .renderPass = ret.pass,
         .basePipelineHandle = VK_NULL_HANDLE,

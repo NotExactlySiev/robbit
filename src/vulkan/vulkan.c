@@ -342,7 +342,8 @@ void the_rest(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_
 }
 
 
-void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size, u16 *texture, int tex_w, int tex_h)
+//void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size)
+void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size)
 {
     /*
     int texWidth;
@@ -429,7 +430,7 @@ void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 
         uniform_buffers[i] = create_buffer(4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(ldev, uniform_buffers[i].mem, 0, 1, 0, &ubo_colors[i]);
         // POINTS
-        VkWriteDescriptorSet writes[2] = { 
+        VkWriteDescriptorSet writes[1] = { 
             {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = desc_sets[i],
@@ -445,7 +446,7 @@ void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 
                     }
                 },
             },
-            {
+            /*{
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = desc_sets[i],
                 .dstBinding = 1,
@@ -459,7 +460,7 @@ void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 
                             .sampler = sampler,
                     },
                 },
-            },
+            },*/
         };
 
         vkUpdateDescriptorSets(ldev, 1, writes, 0, NULL);
@@ -468,9 +469,9 @@ void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 
 
     // ### buffer comes in from the caller, who also records
     Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    Buffer index_buf = create_buffer(index_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    //Buffer index_buf = create_buffer(index_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     buffer_write(vert_buf, vert_size, vert_data);
-    buffer_write(index_buf, index_size, index_data);
+    //buffer_write(index_buf, index_size, index_data);
 
 
     VkCommandBuffer command_bufs[swapchain.nimages];
@@ -483,17 +484,11 @@ void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 
 
     vkAllocateCommandBuffers(ldev, &command_buf_alloc_info, command_bufs);
 
-    // record to main draw command buffer
-    // one command buffer for each swapchain image. baked so we can't
-    // change which one it's connected to later.
-    // if I want to have only 2 command buffers, I should write to them
-    // every frame.
     for (int i = 0; i < swapchain.nimages; i++) {
         VkCommandBuffer cbuf = command_bufs[i];
         
         VkCommandBufferBeginInfo begin_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-            //.flags = VK_COMMAND_BUFFER
         };
 	    vkBeginCommandBuffer(cbuf, &begin_info);
 
@@ -513,16 +508,15 @@ void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 
         vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->layout, 0, 1, &desc_sets[i], 0, NULL);
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cbuf, 0, 1, &vert_buf.vk, &offset);
-        // POINTS
         //vkCmdBindIndexBuffer(cbuf, index_buf.vk, 0, VK_INDEX_TYPE_UINT16);
-        //vkCmdDrawIndexed(cbuf, index_size / 2, 1, 0, 0, 0);
-        vkCmdDraw(cbuf, vert_size / sizeof(AlohaVertex), 1, 0, 0);
+        //vkCmdDrawIndexed(cbuf, index_size / sizeof(u16), 1, 0, 0, 0);
+        vkCmdDraw(cbuf, vert_size / sizeof(RobbitVertex), 1, 0, 0);
 
         vkCmdEndRenderPass(cbuf);
         vkEndCommandBuffer(cbuf);
     }
 
-    present_loop(window, command_bufs);
+    present_loop(window, command_bufs, ubo_colors);
     // POINTS
     //destroy_image(teximage);
     destroy_buffer(vert_buf);
@@ -548,7 +542,7 @@ void destroy_pipeline(Pipeline pipe)
     vkDestroyShaderModule(ldev, pipe.frag_shader, NULL);
 }
 
-void present_loop(GLFWwindow *window, VkCommandBuffer cmdbufs[])
+void present_loop(GLFWwindow *window, VkCommandBuffer cmdbufs[], float *ubo_colors[])
 {
     // make the semaphore
     VkSemaphoreCreateInfo semp_info = {
@@ -582,7 +576,7 @@ void present_loop(GLFWwindow *window, VkCommandBuffer cmdbufs[])
 
         t += 0.05;
         //*ubo_colors[img_index] = (sinf(t) + 1.0f)/2;
-        
+        *ubo_colors[img_index] = t;
 
         VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	    VkSubmitInfo submit_info = {

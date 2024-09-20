@@ -24,7 +24,7 @@ typedef struct {
     u16 flags1;
 
     // normal vector
-    u16 nv0, nv1, nv2, nv3;
+    i16 nv0, nv1, nv2, nv3;
 
     // texture coordinates (if textured)
     u8 tu0, tv0;
@@ -63,7 +63,12 @@ static inline _Color color_15_to_24(u16 col)
 }
 
 typedef struct {
+    u16 x, y, z, pad;
+} NormalVec;
+
+typedef struct {
     AlohaVertex pos;
+    NormalVec normal;
     u8 u, v;
     _Color col;
 } RobbitVertex;

@@ -3,8 +3,8 @@
 #include <stdio.h>
 
 
-static VkAttachmentDescription default_attachment_desc = {
-    .format = VK_FORMAT_B8G8R8A8_SRGB,//swapchainc.imageFormat,
+static VkAttachmentDescription default_color_attachment_desc = {
+    .format = VK_FORMAT_B8G8R8A8_SRGB,
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
     .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -12,6 +12,17 @@ static VkAttachmentDescription default_attachment_desc = {
     .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+};
+
+static VkAttachmentDescription default_depth_attachment_desc = {
+    .format = VK_FORMAT_D32_SFLOAT,
+    .samples = VK_SAMPLE_COUNT_1_BIT,
+    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    .finalLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
 };
 
 static VkPipelineVertexInputStateCreateInfo default_vertex_input_state  = {
@@ -24,7 +35,7 @@ static VkPipelineVertexInputStateCreateInfo default_vertex_input_state  = {
     },
     // TODO: we can have per polygon (per instance) color here!
     // this shouldn't be default, should it?
-    .vertexAttributeDescriptionCount = 2,
+    .vertexAttributeDescriptionCount = 3,
     .pVertexAttributeDescriptions = (VkVertexInputAttributeDescription[]) {
         {
             .location = 0,
@@ -37,6 +48,12 @@ static VkPipelineVertexInputStateCreateInfo default_vertex_input_state  = {
             .binding = 0,
             .format = VK_FORMAT_R8G8B8_UNORM,
             .offset = offsetof(RobbitVertex, col),
+        },
+        {
+            .location = 2,
+            .binding = 0,
+            .format = VK_FORMAT_R16G16B16_UNORM,
+            .offset = offsetof(RobbitVertex, normal),
         },
     },
 };
@@ -112,9 +129,18 @@ static create_default_renderpass(VkRenderPass *pass)
     VkSubpassDescription subp_descp = {
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .colorAttachmentCount = 1,
-        .pColorAttachments = &(VkAttachmentReference) {
-            .attachment = 0,
-            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .pColorAttachments = (VkAttachmentReference[]) {
+            {
+                .attachment = 0,
+                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            },
+        },
+        .pDepthStencilAttachment = 1,
+        .pDepthStencilAttachment = (VkAttachmentReference[]) {
+            {
+                .attachment = 1,
+                .layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+            },
         },
     };
 
@@ -122,11 +148,15 @@ static create_default_renderpass(VkRenderPass *pass)
     // subpass. the implicit ones used are fine
     VkRenderPassCreateInfo renderpass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = 1,
-        .pAttachments = &default_attachment_desc,
+        .attachmentCount = 2,
+        .pAttachments = (VkAttachmentDescription[]){ 
+            default_color_attachment_desc,
+            default_depth_attachment_desc,
+        },
         .subpassCount = 1,
         .pSubpasses = &subp_descp,
     };
+    printf("creating render pass %d\n", renderpass_info.attachmentCount);
     vkCreateRenderPass(ldev, &renderpass_info, NULL, pass);
 }
 
@@ -281,7 +311,7 @@ Pipeline create_pipeline_normal(void)
     // for now have one set that sends a single color
     vkCreateDescriptorSetLayout(ldev, &(VkDescriptorSetLayoutCreateInfo) {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1,
+        .bindingCount = 2,
         .pBindings = (VkDescriptorSetLayoutBinding[]) {
             {
                 .binding = 0,
@@ -305,8 +335,7 @@ Pipeline create_pipeline_normal(void)
     };
     vkCreatePipelineLayout(ldev, &pipeline_layout_info, NULL, &ret.layout);
 
-
-    VkGraphicsPipelineCreateInfo pipeline_info = {
+    vkCreateGraphicsPipelines(ldev, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo) {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .stageCount = 2,
         .pStages = shader_stages,
@@ -320,14 +349,13 @@ Pipeline create_pipeline_normal(void)
             .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
             .depthTestEnable = VK_TRUE,
             .depthWriteEnable = VK_TRUE,
+            .depthCompareOp = VK_COMPARE_OP_GREATER,
         },
         .layout = ret.layout,
         .renderPass = ret.pass,
         .basePipelineHandle = VK_NULL_HANDLE,
         .basePipelineIndex = -1,
-    };
-
-    rc = vkCreateGraphicsPipelines(ldev, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &ret.vk);
+    }, NULL, &ret.vk);
 
     return ret;
 }

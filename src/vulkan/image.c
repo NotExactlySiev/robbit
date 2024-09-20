@@ -1,9 +1,9 @@
 #include <vulkan/vulkan.h>
 #include "app.h"
 
-Image create_image(uint32_t w, uint32_t h, VkFormat format)
+Image create_image(uint32_t w, uint32_t h, VkFormat fmt, VkImageUsageFlags use)
 {
-    Image ret = { .w = w, .h = h, .format = format };
+    Image ret = { .w = w, .h = h, .format = fmt };
     vkCreateImage(ldev, &(VkImageCreateInfo) {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .imageType = VK_IMAGE_TYPE_2D,
@@ -15,10 +15,10 @@ Image create_image(uint32_t w, uint32_t h, VkFormat format)
         .mipLevels = 1,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
-        .format = format,
+        .format = fmt,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+        .usage = use,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     }, NULL, &ret.vk);
 
@@ -29,7 +29,7 @@ Image create_image(uint32_t w, uint32_t h, VkFormat format)
     return ret;
 }
 
-VkImageView image_create_view(Image img)
+VkImageView image_create_view(Image img, VkImageAspectFlags aspect)
 {
     VkImageView ret;
     vkCreateImageView(ldev, &(VkImageViewCreateInfo){
@@ -38,7 +38,7 @@ VkImageView image_create_view(Image img)
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = img.format,
         .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = aspect,   // TODO: this should be determined by usage flags
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,

@@ -103,6 +103,7 @@ Swapchain create_swapchain(Surface surface)
 
     printf("Retrieved %d images from the swapchain.\n", ret.nimages);
 
+    // TODO: use image_create_view here
     // create a view for each so we can give it to the renderpass
     VkImageViewCreateInfo viewc = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -341,32 +342,21 @@ void the_rest(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_
     }
 }
 
-
-//void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size)
-void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size)
+Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h)
 {
-    /*
-    int texWidth;
-    int texHeight;
-    int ntex;
-    u16 *textures = tmp_get_level_textures("./SOU_DAT.EAR", &texWidth, &texHeight);
-    printf("%d %d\n", texWidth, texHeight);
-    Image teximage = create_image(texWidth, texHeight, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR);
-    image_write(&teximage, textures);
-    VkImageView texview = image_create_view(teximage);
+    VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    Image ret = create_image(w, h, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR, flags);
 
-    Image subimg = create_image(64, 64, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR);
-
-    image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    image_set_layout(&subimg, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    image_set_layout(img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    image_set_layout(&ret, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkCommandBuffer cb = begin_tmp_cmdbuf();
     vkCmdCopyImage(cb, 
-        teximage.vk, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 
-        subimg.vk, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+        img->vk, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 
+        ret.vk, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
         1, (VkImageCopy[]) {
             {
-                .srcOffset = { 128, 64, 0 },
+                .srcOffset = { x, y, 0 },
                 .dstOffset = { 0, 0, 0 },
                 .srcSubresource = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -376,18 +366,35 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size)
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .layerCount = 1,
                 },
-                .extent = { 64, 64, 1 },
+                .extent = { w, h, 1 },
             }
         }
     );
     end_tmp_cmdbuf(cb);
 
-    texview = image_create_view(subimg);
+    image_set_layout(&ret, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    image_set_layout(&subimg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    */
+    return ret;
+}
 
-    VkImageView texview = 0;
+
+//void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size)
+void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, void *objs_node)
+{
+    // get the texture
+    int texWidth;
+    int texHeight;
+    int ntex;
+    VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    u16 *textures = tmp_get_level_textures(objs_node, &texWidth, &texHeight);
+    printf("%d %d\n", texWidth, texHeight);
+    Image teximage = create_image(texWidth, texHeight, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR, flags);
+    image_write(&teximage, textures);
+    VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
+    texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
+
 
     VkSampler sampler;
     vkCreateSampler(ldev, &(VkSamplerCreateInfo){
@@ -400,13 +407,24 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size)
     }, NULL, &sampler);
 
 
+    Image zimage = create_image(
+        surface.cap.currentExtent.width,
+        surface.cap.currentExtent.height,
+        VK_FORMAT_D32_SFLOAT,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    VkImageView zview = image_create_view(zimage, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+
     VkFramebuffer framebuffers[swapchain.nimages];
     for (size_t i = 0; i < swapchain.nimages; i++) {
         VkFramebufferCreateInfo framebuffer_info = {
             .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             .renderPass = pipe->pass,
-            .attachmentCount = 1,
-            .pAttachments = &swapchain.views[i],
+            .attachmentCount = 2,
+            .pAttachments = (VkImageView[]) {
+                swapchain.views[i],
+                zview,
+            },
             .width = surface.cap.currentExtent.width,
             .height = surface.cap.currentExtent.height,
             .layers = 1,
@@ -430,7 +448,7 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size)
         uniform_buffers[i] = create_buffer(4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(ldev, uniform_buffers[i].mem, 0, 1, 0, &ubo_colors[i]);
         // POINTS
-        VkWriteDescriptorSet writes[1] = { 
+        VkWriteDescriptorSet writes[2] = { 
             {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = desc_sets[i],
@@ -446,7 +464,7 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size)
                     }
                 },
             },
-            /*{
+            {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = desc_sets[i],
                 .dstBinding = 1,
@@ -455,15 +473,15 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size)
                 .descriptorCount = 1,
                 .pImageInfo = &(VkDescriptorImageInfo[]) {
                     {
-                            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                            .imageView = texview,
-                            .sampler = sampler,
+                        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                        .imageView = texview,
+                        .sampler = sampler,
                     },
                 },
-            },*/
+            },
         };
 
-        vkUpdateDescriptorSets(ldev, 1, writes, 0, NULL);
+        vkUpdateDescriptorSets(ldev, 2, writes, 0, NULL);
     }
 
 

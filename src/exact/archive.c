@@ -41,13 +41,12 @@ static EarNodeType find_type(void *data)
     // we already know it's a real node (not separator) so simply
     // check if the header has a valid structure for a directory
     u32 *p = data;
-    u32 first;
-    u32 prev;
-
-    first = u32be(p++);
-    prev = first;
-    for (int i = 1; i < EAR_MAX_CHILDREN; i++) {
+    u32 first = 0;
+    u32 prev = first;
+    for (int i = 0; i < EAR_MAX_CHILDREN; i++) {
+        
         u32 offset = u32be(p++);
+        if (first == 0) first = offset;
         if (offset == EAR_HEADER_TERMINATOR && (i+1)*4 == first)
             return EAR_NODE_TYPE_DIR;
         if (offset != 0 && offset <= prev)

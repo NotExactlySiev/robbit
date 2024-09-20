@@ -7,10 +7,7 @@
 #include "core/level.h"
 #include "vulkan/app.h"
 
-
-void the_rest(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size);
-//void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size);
-void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size);
+void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, EarNode *objs_node);
 Pipeline create_pipeline_points();
 Pipeline create_pipeline_normal();
 
@@ -29,42 +26,36 @@ static void print_content(EarNode *n)
         printf("\t[%s]", str);
 }
 
+static void nop(EarNode *n) {}
+
 GLFWwindow *window;
 AlohaMesh meshes_normal[128];
 AlohaMesh meshes_lod[128];
 u16 *clut_data;
 
-int main(int argc, char **argv)
+u16 **tmp_get_level_textures(EarNode *objs_node, int *w, int *h)
 {
-    /*
-    uint16_t tri_index_data[] = {
-        85,	81,	83,
-        80,	84,	82,
-        29,	22,	21,
-        29,	21,	28,
-        16,	13,	15,
-        15,	13,	14,
-        14,	13,	12,
-        29,	28,	27,
-        18,	13,	17,
-        20,	13,	19,
-        19,	13,	18,
-        17,	13,	16,
-        29,	25,	24,
-        ...
-    };
+    EarNode *clut_node = &objs_node->sub[1];
+    EarNode *tex_node = &objs_node->sub[5];
 
-    uint16_t quad_index_data[] = {
-        83,	82,	84,	85,
-        85,	84,	80,	81,
-        81,	80,	82,	83,
-        ...
-    };
-
-
-    }*/
-
+    u8 *p = (uint8_t*) tex_node->buf;
+    u16 _w = (p[4] << 8) | (p[5]);
+    u16 _h = (p[6] << 8) | (p[7]);
+    *w = _w;
+    *h = _h;
+    u8 *indexes = tex_node->buf + 8;
+    u16 *pixels = malloc(_w*_h*sizeof(u16));
+    u16 *clut = clut_node->buf;
+    for (int i = 0; i < _w*_h; i++) {
+        pixels[i] = clut[indexes[i]];
+    }
     
+
+    return pixels;
+}
+
+int main(int argc, char **argv)
+{    
     if (argc != 2) {
         printf(USAGE);
         return -1;
@@ -79,12 +70,14 @@ int main(int argc, char **argv)
     fclose(fd);
 
     Ear *ear = ear_decode(buffer, 0);
-    F(ear);
-    ear_print(ear->nodes, print_content);
-    
+    //F(ear);
+    //ear_print(ear->nodes, print_content);
+    ear_print(ear->nodes, nop);
+    return 0;
+
     // find the objects list and level data nodes
     // just fucking terrible code
-    /*EarNode *objs_node = NULL;
+    EarNode *objs_node = NULL;
     for (EarNode *np = ear->nodes->sub + 4; np->type != EAR_NODE_TYPE_SEPARATOR; np++) {
         if (np->type == EAR_NODE_TYPE_DIR && aloha(np)->content == EAR_CONTENT_ENTITY) {
             objs_node = np;
@@ -103,14 +96,15 @@ int main(int argc, char **argv)
     EarNode *geom_node = &stage_node->sub[2];
 
     printf("objs node is %d\n", objs_node - ear->nodes);
-    //printf("geom node is %d\n", stage_node - ear->nodes);
+    printf("geom node is %d\n", stage_node - ear->nodes);
 
     // parsing and converting objs. first: is lod a subset of normal?
+    clut_data = aloha(objs_node)->model.mesh_clut->buf;
     
     mesh_file_parse(objs_node->sub[2].buf, meshes_normal);
     mesh_file_parse(objs_node->sub[3].buf, meshes_lod);
 
-    for (int i = 0; i < 128; i++) {
+    /*for (int i = 0; i < 128; i++) {
         printf("%03d:\t", i);
         if (meshes_normal[i].empty)
             printf("---\t");
@@ -132,7 +126,7 @@ int main(int argc, char **argv)
             if (lod) printf("!!! Only LOD");
         }
         printf("\n");
-    }
+    }*/
 
     int nobjs = geom_count(geom_node->buf);
     printf("%d objects\n", nobjs);
@@ -142,71 +136,64 @@ int main(int argc, char **argv)
     printf("??? entities\n");
 
     AlohaMesh *house = &meshes_normal[66];
-    */
+    
 
-    EarNode *kiwi_node = &ear->nodes->sub[1];
-
-    mesh_file_parse(kiwi_node->sub[2].buf, meshes_normal);
-    AlohaMesh *house = &meshes_normal[1];
+    //EarNode *kiwi_node = &ear->nodes->sub[0];
+    //mesh_file_parse(kiwi_node->sub[2].buf, meshes_normal);
+    //AlohaMesh *house = &meshes_normal[1];
     void *x = house->faces;
 
-    clut_data = aloha(kiwi_node)->model.mesh_clut->buf;
+    //clut_data = aloha(kiwi_node)->model.mesh_clut->buf;
 
     int nfaces = mesh_faces(NULL, house);
     AlohaFace faces[nfaces];
     printf("%d FACES\n");
     mesh_faces(faces, house);
     
-    //u16 index_data[2048][3];
 
     int nprims = 0;
-
-    
-    /*for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
-        printf("%d %d %d %d\n", f->v0, f->v1, f->v2, f->v3);
-        index_data[nprims][0] = f->v0;
-        index_data[nprims][1] = f->v1;
-        index_data[nprims][2] = f->v2;
-        nprims++;
-        if (f->v3 != 0) {
-            index_data[nprims][0] = f->v0;
-            index_data[nprims][1] = f->v2;
-            index_data[nprims][2] = f->v3;
-            nprims++;
-        }
-    }*/
-
-    /*for (int i = 0; i < nprims; i++) {
-        printf("%d %d %d\n", index_data[i][0], index_data[i][1], index_data[i][2]);
-    }*/
-
-    // screw it, no drawindexed for you. make everything into verts
-
     RobbitVertex vkverts[2048][3] = {0};
 
     for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
         //printf("%d %d %d %d\n", f->v0, f->v1, f->v2, f->v3);
         bool tex = !(f->flags1 & 0x8000);
+        bool lit = !(f->flags0 & 0x0001);
+        
         vkverts[nprims][0].pos = house->verts[f->v0];
         vkverts[nprims][1].pos = house->verts[f->v1];
         vkverts[nprims][2].pos = house->verts[f->v2];
         
         
+
+        if (lit) {
+            vkverts[nprims][0].normal.x = f->nv0;
+            vkverts[nprims][0].normal.y = f->nv1;
+            vkverts[nprims][0].normal.z = f->nv2;
+            printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
+        }
+
         if (!tex) {
             vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
-            //vkverts[nprims][1].col = clut_data[f->flags0 >> 2];
-            //vkverts[nprims][2].col = clut_data[f->flags0 >> 2];
         }
+
+
         nprims++;
 
         if (f->v3 != 0) {
             vkverts[nprims][0].pos = house->verts[f->v0];
             vkverts[nprims][1].pos = house->verts[f->v2];
             vkverts[nprims][2].pos = house->verts[f->v3];
+
+            
+            if (lit) {
+                vkverts[nprims][0].normal.x = f->nv0;
+                vkverts[nprims][0].normal.y = f->nv1;
+                vkverts[nprims][0].normal.z = f->nv2;
+                printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
+            }
+
             if (!tex) {
                 vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
-                //vkverts[nprims][1].col = clut_data[f->flags0 >> 2];
-                //vkverts[nprims][2].col = clut_data[f->flags0 >> 2];
             }
             nprims++;
         }
@@ -225,7 +212,7 @@ int main(int argc, char **argv)
 
     create_app(window);
 
-    Pipeline points_pipe = create_pipeline_points();
+    //Pipeline points_pipe = create_pipeline_points();
 
 
     // convert to the format vulkan likes
@@ -234,20 +221,19 @@ int main(int argc, char **argv)
     // then apply other adjustments from there (divide by 3 etc.)
 
     
-
     Pipeline normal_pipe = create_pipeline_normal();
     
     //the_rest(&normal_pipe, house->verts, house->nverts * sizeof(AlohaVertex), NULL, 0);
     //the_rest_normal(&normal_pipe, house->verts, house->nverts * sizeof(AlohaVertex), index_data, 3*sizeof(u16)*nprims);
-    the_rest_normal(&normal_pipe, vkverts, 3 * nprims * sizeof(RobbitVertex));
+    the_rest_normal(&normal_pipe, vkverts, 3 * nprims * sizeof(RobbitVertex), objs_node);
 
-    destroy_pipeline(points_pipe);
+    //destroy_pipeline(points_pipe);
     destroy_pipeline(normal_pipe);
     destroy_app();
 
     glfwDestroyWindow(window);
     glfwTerminate();
-
+    
     return 0;
 }
 

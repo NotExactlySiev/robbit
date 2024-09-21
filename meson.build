@@ -4,7 +4,7 @@ sources = files([
   'src/exact/archive.c', 'src/exact/press.c', 'src/main.c',
   'src/vulkan/buffer.c', 'src/vulkan/device.c', 'src/vulkan/image.c', 'src/vulkan/memory.c',
   'src/vulkan/descriptor.c', 'src/vulkan/vulkan.c', 'src/vulkan/pipeline.c',
-  'src/core/image.c', 'src/core/level.c', 'src/core/mesh.c', 'src/core/aloha.c',
+  'src/core/level.c', 'src/core/mesh.c', 'src/core/aloha.c',
   #'src/ui/ImGuiFileDialog.cpp', 'src/ui/ui.cpp', 
 ])
 

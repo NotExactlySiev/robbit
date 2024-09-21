@@ -1,6 +1,7 @@
 #ifndef _VULKAN_H
 #define _VULKAN_H
 
+#include <types.h>
 #include <string.h>
 #include <vulkan/vulkan.h>
 #include <SDL.h>
@@ -43,8 +44,10 @@ typedef struct {
     VkShaderModule frag_shader;
 } Pipeline;
 
-
-
+typedef struct {
+    u32 offset;
+    VkFormat format;
+} VertexAttr;
 
 // globals
 extern SDL_Window *window;
@@ -58,6 +61,7 @@ extern Swapchain swapchain;
 // pools
 extern VkCommandPool cmdpool;
 
+Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs);
 
 VkCommandBuffer begin_tmp_cmdbuf(void);
 void end_tmp_cmdbuf(VkCommandBuffer buf);

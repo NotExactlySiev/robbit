@@ -241,8 +241,8 @@ void print_content(EarNode *n)
         printf("\t[%s]", str);
 }
 
-AlohaMesh meshes_normal[128];
-AlohaMesh meshes_lod[128];
+RobbitMesh meshes_normal[128];
+RobbitMesh meshes_lod[128];
 u16 *clut_data;
 GLuint texid[2];
 
@@ -348,7 +348,7 @@ int main(int argc, char **argv)
 
     printf("??? entities\n");
 
-    AlohaMesh *house = &meshes_normal[66];
+    RobbitMesh *house = &meshes_normal[66];
     void *x = house->faces;
     for (uint i = 0; i < house->groups_count; i++) {
         u32 subgroups_count = *(u32*)x + 1;

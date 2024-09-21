@@ -8,7 +8,7 @@
 #include <math.h>
 #include <types.h>
 
-#include "image.h"
+//#include "image.h"
 #include "mesh.h"
 
 // The interface I want is these functions:
@@ -17,7 +17,7 @@
 
 // there is a raw binary, of the vo2 file
 // a function takes it in, parses it, and returns an array of
-// AlohaMesh structs. this array is all the meshes in the file,
+// RobbitMesh structs. this array is all the meshes in the file,
 // all 128 of them, even the empty ones. the empty ones
 // explicitely say that they are empty (4 bytes, all zero)
 // the non-empty ones have pointers to the start of each of their
@@ -25,8 +25,8 @@
 // basically only the things we have to calculate anyway just to
 // enumerate the meshes and find the pointer to the start of each one
 // u32 mesh_count(u8 *raw)  // just return the top number
-// mesh_parse(u8 *raw, AlohaMesh *out)
-// mesh_draw(SDL_Renderer *rend, AlohaMesh *mesh, u16 *clut, [texture])
+// mesh_parse(u8 *raw, RobbitMesh *out)
+// mesh_draw(SDL_Renderer *rend, RobbitMesh *mesh, u16 *clut, [texture])
 
 // how many meshes are in this file? (always is 128)
 u32 mesh_file_count(const u8 *data)
@@ -37,13 +37,13 @@ u32 mesh_file_count(const u8 *data)
           | ((u32) data[3] << 24));
 }
 
-u32 mesh_file_parse(const u8 *data, AlohaMesh *out)
+u32 mesh_file_parse(const u8 *data, RobbitMesh *out)
 {
     u32 count = mesh_file_count(data);
     u32 count_non_empty = 0;
     void *p = data + 4;
     for (uint i = 0; i < count; i++) {
-        out[i] = (AlohaMesh) {0};
+        out[i] = (RobbitMesh) {0};
         out[i].head = p;
         if (*(u32*)p == 0) {
             p += 4;
@@ -168,7 +168,7 @@ static GLuint repeat_texpage(u32 tw, u16 *pixels, int main_w, int main_h, float 
 }
 
 // this should just receive images and make the textures by itself
-void mesh_render_opengl(AlohaMesh *mesh, u16 *clut, void **textures)
+void mesh_render_opengl(RobbitMesh *mesh, u16 *clut, void **textures)
 {   
     void *p = mesh->faces;
     for (uint i = 0; i < mesh->groups_count; i++) {
@@ -250,14 +250,14 @@ void mesh_render_opengl(AlohaMesh *mesh, u16 *clut, void **textures)
 */
 
 /*
-void mesh_render_vulkan(AlohaMesh *mesh, u16 *clut, void **textures)
+void mesh_render_vulkan(RobbitMesh *mesh, u16 *clut, void **textures)
 {   
 }
 */
 
 // this method ONLY extracts an array of faces and translate indices
 // only returns count if out == NULL
-int mesh_faces(AlohaFace *dst, AlohaMesh *mesh)
+int mesh_faces(AlohaFace *dst, RobbitMesh *mesh)
 {
     int ret = 0;
     void *p = mesh->faces;

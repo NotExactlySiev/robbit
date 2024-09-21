@@ -5,12 +5,11 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "../exact/archive.h"
-//#include <SDL.h>
-//#include "image.h"
 #include "mesh.h"
 
+#define ENE_MAX_OBJS    16
 
-#define READ_BE32(x,p)  { (x) = *p++ << 24; x |= *p++ << 16; x |= *p++ << 8; x |= *p++ << 0; }
+// TODO: bring the big endian inline functions here
 #define READ_BE16(x,p)  { x = *p++ << 8; x |= *p++ << 0; }
 
 #define CONTENTS                    \
@@ -80,24 +79,17 @@ typedef struct {
     EarNode *node;
 } DatFile;
 
-#define ENE_MAX_OBJS    16
-
 typedef struct {
     int nobjs;
     AlohaObjSet objs[ENE_MAX_OBJS];
 } EneFile;
 
-// these should be in aloha.h?
-AlohaMetadata *aloha(EarNode *node);
+// those get parsed into these:
 
-// basic types
-
-/*
 typedef struct {
-    EarNode *section0;
-    EarNode *section1;
-    EarNode *section2;
-    EarNode *section3;
-} Level;*/
+    RobbitMesh normal[128];
+    RobbitMesh lod[128];
+} RobbitObjSet;
+
 
 #endif

@@ -14,7 +14,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-
+#include "../core/common.h"
 #include "app.h"
 
 VkInstance inst;
@@ -90,9 +90,6 @@ Swapchain create_swapchain(Surface surface)
         .clipped = VK_TRUE,
         .oldSwapchain = VK_NULL_HANDLE,
     };
-
-    // we make the swapchain, the swapchain gives us a bunch of images to draw to.
-    // what if I don't want to do buffering? probably can't be done hm
 
     rc = vkCreateSwapchainKHR(ldev, &swapchainc, NULL, &ret.vk);
     VK_CHECK_ERR("Can't create swapchain");
@@ -183,8 +180,7 @@ void create_app(SDL_Window *window)
     // command pool and command buffer from the queue
     VkCommandPoolCreateInfo command_pool_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        //.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        //.flags = VK_COMMAND_POOL
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = queue_family_idx,
     };
     
@@ -223,127 +219,6 @@ void destroy_app(void)
     vkDestroyInstance(inst, NULL);
 }
 
-
-void the_rest(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size)
-{
-
-    // ### this part goes to swapchain creation
-
-    // should FBs also be part of swapchain?
-    // but they depend on the renderpass, so probably not.
-    // now finally attach the fucking thing and make framebuffers
-    VkFramebuffer framebuffers[swapchain.nimages];
-    for (size_t i = 0; i < swapchain.nimages; i++) {
-        VkFramebufferCreateInfo framebuffer_info = {
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass = pipe->pass,
-            .attachmentCount = 1,
-            .pAttachments = &swapchain.views[i],
-            .width = surface.cap.currentExtent.width,
-            .height = surface.cap.currentExtent.height,
-            .layers = 1,
-        };
-        vkCreateFramebuffer(ldev, &framebuffer_info, NULL, &framebuffers[i]);
-    }
-
-    VkDescriptorSet desc_sets[max_frames];
-    vkAllocateDescriptorSets(ldev, &(VkDescriptorSetAllocateInfo){
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = descpool,
-        .descriptorSetCount = 4,
-        .pSetLayouts = (VkDescriptorSetLayout[]) { pipe->set, pipe->set, pipe->set, pipe->set },
-    }, &desc_sets);
-
-    Buffer uniform_buffers[max_frames];
-    float *ubo_colors[max_frames];
-
-    // and bind them to the resources. fuck this shit
-    for (size_t i = 0; i < max_frames; i++) {
-        uniform_buffers[i] = create_buffer(4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        vkMapMemory(ldev, uniform_buffers[i].mem, 0, 1, 0, &ubo_colors[i]);
-        VkWriteDescriptorSet writes[1] = { 
-            {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = desc_sets[i],
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .descriptorCount = 1,
-                .pBufferInfo = &(VkDescriptorBufferInfo[]) {
-                    {
-                        .buffer = uniform_buffers[i].vk,
-                        .offset = 0,
-                        .range = 4,
-                    }
-                },
-            },
-        };
-
-        vkUpdateDescriptorSets(ldev, 1, writes, 0, NULL);
-    }
-
-
-    // ### buffer comes in from the caller, who also records
-    Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    buffer_write(vert_buf, vert_size, vert_data);
-
-
-    VkCommandBuffer command_bufs[swapchain.nimages];
-    VkCommandBufferAllocateInfo command_buf_alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = cmdpool,
-        .commandBufferCount = swapchain.nimages,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-    };
-
-    vkAllocateCommandBuffers(ldev, &command_buf_alloc_info, command_bufs);
-
-    // record to main draw command buffer
-    // one command buffer for each swapchain image. baked so we can't
-    // change which one it's connected to later.
-    // if I want to have only 2 command buffers, I should write to them
-    // every frame.
-    for (int i = 0; i < swapchain.nimages; i++) {
-        VkCommandBuffer cbuf = command_bufs[i];
-        
-        VkCommandBufferBeginInfo begin_info = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        };
-	    vkBeginCommandBuffer(cbuf, &begin_info);
-
-        VkRenderPassBeginInfo renderpass_begin_info = {
-            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            .renderPass = pipe->pass,       // begin THIS renderpass
-            .framebuffer = framebuffers[i], // with THESE atachments
-            .renderArea.extent = surface.cap.currentExtent,
-            .clearValueCount = 1,
-            .pClearValues = &(VkClearValue) {0.0f, 0.0f, 0.0f, 0.0f},
-        };
-
-	    vkCmdBeginRenderPass(cbuf, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-        
-	    vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->vk);
-        vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->layout, 0, 1, &desc_sets[i], 0, NULL);
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cbuf, 0, 1, &vert_buf.vk, &offset);
-        vkCmdDraw(cbuf, vert_size / sizeof(AlohaVertex), 1, 0, 0);
-
-        vkCmdEndRenderPass(cbuf);
-        vkEndCommandBuffer(cbuf);
-    }
-
-    present_loop(window, command_bufs);
-    destroy_buffer(vert_buf);
-    
-    for (int i = 0; i < swapchain.nimages; i++) {
-        vkDestroyFramebuffer(ldev, framebuffers[i], NULL);
-    }
-
-    for (int i = 0; i < max_frames; i++) {
-        destroy_buffer(uniform_buffers[i]);
-    }
-}
-
 Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h)
 {
     VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -379,10 +254,30 @@ Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h)
     return ret;
 }
 
-void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, Image teximage)
+typedef struct {
+    VkRenderPass pass;
+    VkSemaphore semps_img_avl[4];
+    VkSemaphore semps_rend_fin[4];
+    VkFence queue_fences[4];
+    VkFramebuffer framebuffers[4];
+    VkCommandBuffer cmdbufs[4];
+    VkCommandBuffer current_cmdbuf;
+    int current_frame;
+    uint32_t image_index;
+} PresentContext;
+
+void present_init(PresentContext *ctx, VkRenderPass pass);
+void present_terminate(PresentContext *ctx);
+void present_acquire(PresentContext *ctx);
+void present_submit(PresentContext *ctx);
+void present_end_pass(PresentContext *ctx);
+VkCommandBuffer present_begin_pass(PresentContext *ctx);
+
+
+void the_rest_normal(Pipeline *pipe, RobbitObjSet *objs)
 {
-    image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);
+    //image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    //VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);
 
     //Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
     //texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -397,32 +292,6 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, Ima
         .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
     }, NULL, &sampler);
-
-
-    Image zimage = create_image(
-        surface.cap.currentExtent.width,
-        surface.cap.currentExtent.height,
-        VK_FORMAT_D32_SFLOAT,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    VkImageView zview = image_create_view(zimage, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-
-    VkFramebuffer framebuffers[swapchain.nimages];
-    for (size_t i = 0; i < swapchain.nimages; i++) {
-        VkFramebufferCreateInfo framebuffer_info = {
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass = pipe->pass,
-            .attachmentCount = 2,
-            .pAttachments = (VkImageView[]) {
-                swapchain.views[i],
-                zview,
-            },
-            .width = surface.cap.currentExtent.width,
-            .height = surface.cap.currentExtent.height,
-            .layers = 1,
-        };
-        vkCreateFramebuffer(ldev, &framebuffer_info, NULL, &framebuffers[i]);
-    }
 
     VkDescriptorSet desc_sets[max_frames];
     vkAllocateDescriptorSets(ldev, &(VkDescriptorSetAllocateInfo){
@@ -456,7 +325,7 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, Ima
                     }
                 },
             },
-            {
+            /*{
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = desc_sets[i],
                 .dstBinding = 1,
@@ -470,111 +339,21 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, Ima
                         .sampler = sampler,
                     },
                 },
-            },
+            },*/
         };
 
-        vkUpdateDescriptorSets(ldev, 2, writes, 0, NULL);
+        vkUpdateDescriptorSets(ldev, 1, writes, 0, NULL);
     }
 
 
     // ### buffer comes in from the caller, who also records
-    Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    //Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     //Buffer index_buf = create_buffer(index_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    buffer_write(vert_buf, vert_size, vert_data);
+    //buffer_write(vert_buf, vert_size, vert_data);
     //buffer_write(index_buf, index_size, index_data);
 
-
-    VkCommandBuffer command_bufs[swapchain.nimages];
-    VkCommandBufferAllocateInfo command_buf_alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = cmdpool,
-        .commandBufferCount = swapchain.nimages,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-    };
-
-    vkAllocateCommandBuffers(ldev, &command_buf_alloc_info, command_bufs);
-
-    for (int i = 0; i < swapchain.nimages; i++) {
-        VkCommandBuffer cbuf = command_bufs[i];
-        
-        VkCommandBufferBeginInfo begin_info = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        };
-	    vkBeginCommandBuffer(cbuf, &begin_info);
-
-        VkRenderPassBeginInfo renderpass_begin_info = {
-            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-            .renderPass = pipe->pass,       // begin THIS renderpass
-            .framebuffer = framebuffers[i], // with THESE atachments
-            .renderArea.extent = surface.cap.currentExtent,
-            .clearValueCount = 2,
-            .pClearValues = (VkClearValue[])  {
-                {   .color = {0.0f, 0.0f, 0.0f, 0.0f} },
-                {   .depthStencil = { .depth = 0.0f } },
-            },
-        };
-
-        
-	    vkCmdBeginRenderPass(cbuf, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-        
-	    vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->vk);
-        vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->layout, 0, 1, &desc_sets[i], 0, NULL);
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cbuf, 0, 1, &vert_buf.vk, &offset);
-        //vkCmdBindIndexBuffer(cbuf, index_buf.vk, 0, VK_INDEX_TYPE_UINT16);
-        //vkCmdDrawIndexed(cbuf, index_size / sizeof(u16), 1, 0, 0, 0);
-        vkCmdDraw(cbuf, vert_size / sizeof(RobbitVertex), 1, 0, 0);
-
-        vkCmdEndRenderPass(cbuf);
-        vkEndCommandBuffer(cbuf);
-    }
-
-    present_loop(window, command_bufs, ubo_colors);
-    // POINTS
-    //destroy_image(teximage);
-    destroy_buffer(vert_buf);
-    //destroy_buffer(index_buf);
-    
-    // destroy_swapchain
-    for (int i = 0; i < swapchain.nimages; i++) {
-        vkDestroyFramebuffer(ldev, framebuffers[i], NULL);
-    }
-
-    for (int i = 0; i < max_frames; i++) {
-        destroy_buffer(uniform_buffers[i]);
-    }
-}
-
-void destroy_pipeline(Pipeline pipe)
-{
-    vkDestroyDescriptorSetLayout(ldev, pipe.set, NULL);
-    vkDestroyPipelineLayout(ldev, pipe.layout, NULL);
-    vkDestroyPipeline(ldev, pipe.vk, NULL);
-    vkDestroyRenderPass(ldev, pipe.pass, NULL);
-    vkDestroyShaderModule(ldev, pipe.vert_shader, NULL);
-    vkDestroyShaderModule(ldev, pipe.frag_shader, NULL);
-}
-
-void present_loop(SDL_Window *window, VkCommandBuffer cmdbufs[], float *ubo_colors[])
-{
-    // make the semaphore
-    VkSemaphoreCreateInfo semp_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-    };
-
-    VkFenceCreateInfo queue_fence_info = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-    };
-
-    VkSemaphore semps_img_avl[max_frames];
-    VkSemaphore semps_rend_fin[max_frames];
-    VkFence queue_fences[max_frames];
-    for (int i = 0; i < max_frames; i++) {
-        vkCreateSemaphore(ldev, &semp_info, NULL, &semps_img_avl[i]); 
-        vkCreateFence(ldev, &queue_fence_info, NULL, &queue_fences[i]);
-        vkCreateSemaphore(ldev, &semp_info, NULL, &semps_rend_fin[i]); 
-    }
+    PresentContext ctx = {0};
+    present_init(&ctx, pipe->pass);
 
     bool running = true;
     float t = 0.0;
@@ -595,52 +374,174 @@ void present_loop(SDL_Window *window, VkCommandBuffer cmdbufs[], float *ubo_colo
             }
         }
 
-        vkWaitForFences(ldev, 1 ,&queue_fences[current_frame], VK_TRUE, UINT64_MAX);
-        vkResetFences(ldev, 1, &queue_fences[current_frame]);
-
-        uint32_t img_index;
-        vkAcquireNextImageKHR(ldev, swapchain.vk, UINT64_MAX, semps_img_avl[current_frame], VK_NULL_HANDLE, &img_index);
-
         t += 0.05;
-        //*ubo_colors[img_index] = (sinf(t) + 1.0f)/2;
-        *ubo_colors[img_index] = t;
+        *ubo_colors[ctx.image_index] = t;
 
-        VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	    VkSubmitInfo submit_info = {
-	        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &semps_img_avl[current_frame],
-            .pWaitDstStageMask = &wait_stage,
-            .commandBufferCount = 1,
-            .pCommandBuffers = &cmdbufs[img_index],
-            .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &semps_rend_fin[current_frame],
-        };
+        present_acquire(&ctx);
+        VkCommandBuffer cbuf = present_begin_pass(&ctx);
 
+        vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->vk);        
+        vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->layout, 0, 1, &desc_sets[ctx.image_index], 0, NULL);
+        VkDeviceSize offset = 0;
         
-	    vkQueueSubmit(queue, 1, &submit_info, queue_fences[current_frame]);
+        vkCmdBindVertexBuffers(cbuf, 0, 1, &objs->lod[66].vert_buffer.vk, &offset);
+        //vkCmdBindVertexBuffers(cbuf, 0, 1, &vert_buf.vk, &offset);
+        vkCmdDraw(cbuf, objs->lod[66].vert_count, 1, 0, 0);
 
-        // app_present() or something like that?
-        // present
-        VkPresentInfoKHR present_info = {
-	    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &semps_rend_fin[current_frame],
-            .swapchainCount = 1,
-            .pSwapchains = &swapchain.vk,
-            .pImageIndices = &img_index,
-        };
-
-	    vkQueuePresentKHR(queue, &present_info);
-        SDL_GL_SwapWindow(window);
-        current_frame = (current_frame + 1) % max_frames;
+        present_end_pass(&ctx);
+        present_submit(&ctx);
     }
 
-    vkDeviceWaitIdle(ldev);
+    present_terminate(&ctx);
+    // POINTS
+    //destroy_image(teximage);
+    //destroy_buffer(vert_buf);
+    //destroy_buffer(index_buf);
     
+    // destroy_swapchain
+    /*for (int i = 0; i < swapchain.nimages; i++) {
+        vkDestroyFramebuffer(ldev, framebuffers[i], NULL);
+    }*/
+
     for (int i = 0; i < max_frames; i++) {
-        vkDestroySemaphore(ldev, semps_img_avl[i], NULL);
-        vkDestroySemaphore(ldev, semps_rend_fin[i], NULL);
-        vkDestroyFence(ldev, queue_fences[i], NULL);
+        destroy_buffer(uniform_buffers[i]);
     }
+}
+
+void destroy_pipeline(Pipeline pipe)
+{
+    vkDestroyDescriptorSetLayout(ldev, pipe.set, NULL);
+    vkDestroyPipelineLayout(ldev, pipe.layout, NULL);
+    vkDestroyPipeline(ldev, pipe.vk, NULL);
+    vkDestroyRenderPass(ldev, pipe.pass, NULL);
+    vkDestroyShaderModule(ldev, pipe.vert_shader, NULL);
+    vkDestroyShaderModule(ldev, pipe.frag_shader, NULL);
+}
+
+void present_init(PresentContext *ctx, VkRenderPass pass)
+{
+    ctx->pass = pass;
+    Image zimage = create_image(
+        surface.cap.currentExtent.width,
+        surface.cap.currentExtent.height,
+        VK_FORMAT_D32_SFLOAT,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    VkImageView zview = image_create_view(zimage, VK_IMAGE_ASPECT_DEPTH_BIT);
+    for (size_t i = 0; i < swapchain.nimages; i++) {
+        VkFramebufferCreateInfo framebuffer_info = {
+            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .renderPass = pass,
+            .attachmentCount = 2,
+            .pAttachments = (VkImageView[]) {
+                swapchain.views[i],
+                zview,
+            },
+            .width = surface.cap.currentExtent.width,
+            .height = surface.cap.currentExtent.height,
+            .layers = 1,
+        };
+        vkCreateFramebuffer(ldev, &framebuffer_info, NULL, &ctx->framebuffers[i]);
+    }
+
+    //VkCommandBuffer command_bufs[swapchain.nimages];
+    VkCommandBufferAllocateInfo command_buf_alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = cmdpool,
+        .commandBufferCount = swapchain.nimages,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    };
+
+    vkAllocateCommandBuffers(ldev, &command_buf_alloc_info, ctx->cmdbufs);
+
+    // make the semaphore
+    VkSemaphoreCreateInfo semp_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+    };
+
+    VkFenceCreateInfo queue_fence_info = {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+    };
+
+    for (int i = 0; i < max_frames; i++) {
+        vkCreateSemaphore(ldev, &semp_info, NULL, &ctx->semps_img_avl[i]); 
+        vkCreateFence(ldev, &queue_fence_info, NULL, &ctx->queue_fences[i]);
+        vkCreateSemaphore(ldev, &semp_info, NULL, &ctx->semps_rend_fin[i]); 
+    }
+}
+
+void present_terminate(PresentContext *ctx)
+{
+    vkDeviceWaitIdle(ldev);
+    for (int i = 0; i < max_frames; i++) {
+        vkDestroySemaphore(ldev, ctx->semps_img_avl[i], NULL);
+        vkDestroySemaphore(ldev, ctx->semps_rend_fin[i], NULL);
+        vkDestroyFence(ldev, ctx->queue_fences[i], NULL);
+    }
+}
+
+void present_acquire(PresentContext *ctx)
+{
+    vkWaitForFences(ldev, 1 ,&ctx->queue_fences[ctx->current_frame], VK_TRUE, UINT64_MAX);
+    vkResetFences(ldev, 1, &ctx->queue_fences[ctx->current_frame]);
+    vkAcquireNextImageKHR(ldev, swapchain.vk, UINT64_MAX, ctx->semps_img_avl[ctx->current_frame], VK_NULL_HANDLE, &ctx->image_index);
+
+    ctx->current_cmdbuf = ctx->cmdbufs[ctx->image_index];
+	vkBeginCommandBuffer(ctx->current_cmdbuf, &(VkCommandBufferBeginInfo){
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    });
+}
+
+VkCommandBuffer present_begin_pass(PresentContext *ctx)
+{
+    vkCmdBeginRenderPass(ctx->current_cmdbuf, &(VkRenderPassBeginInfo) {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .renderPass = ctx->pass,       // begin THIS renderpass
+        .framebuffer = ctx->framebuffers[ctx->image_index], // with THESE atachments
+        .renderArea.extent = surface.cap.currentExtent,
+        .clearValueCount = 2,
+        .pClearValues = (VkClearValue[])  {
+            {   .color = {0.0f, 0.0f, 0.0f, 0.0f} },
+            {   .depthStencil = { .depth = 0.0f } },
+        },
+    }, VK_SUBPASS_CONTENTS_INLINE);
+    return ctx->current_cmdbuf;
+}
+
+void present_end_pass(PresentContext *ctx)
+{
+    vkCmdEndRenderPass(ctx->current_cmdbuf);
+    vkEndCommandBuffer(ctx->current_cmdbuf);
+}
+
+void present_submit(PresentContext *ctx)
+{
+    int current_frame = ctx->current_frame;
+    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	VkSubmitInfo submit_info = {
+	    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &ctx->semps_img_avl[current_frame],
+        .pWaitDstStageMask = &wait_stage,
+        .commandBufferCount = 1,
+        //.pCommandBuffers = &cmdbufs[img_index],
+        .pCommandBuffers = &ctx->cmdbufs[ctx->image_index],
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = &ctx->semps_rend_fin[current_frame],
+    };
+
+    vkQueueSubmit(queue, 1, &submit_info, ctx->queue_fences[current_frame]);
+
+    VkPresentInfoKHR present_info = {
+	    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &ctx->semps_rend_fin[current_frame],
+        .swapchainCount = 1,
+        .pSwapchains = &swapchain.vk,
+        .pImageIndices = &ctx->image_index,
+    };
+
+    vkQueuePresentKHR(queue, &present_info);
+    SDL_GL_SwapWindow(window);
+    ctx->current_frame = (ctx->current_frame + 1) % max_frames;
 }

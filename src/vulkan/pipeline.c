@@ -35,7 +35,7 @@ static VkPipelineVertexInputStateCreateInfo default_vertex_input_state  = {
     },
     // TODO: we can have per polygon (per instance) color here!
     // this shouldn't be default, should it?
-    .vertexAttributeDescriptionCount = 3,
+    .vertexAttributeDescriptionCount = 4,
     .pVertexAttributeDescriptions = (VkVertexInputAttributeDescription[]) {
         {
             .location = 0,
@@ -54,6 +54,12 @@ static VkPipelineVertexInputStateCreateInfo default_vertex_input_state  = {
             .binding = 0,
             .format = VK_FORMAT_R16G16B16_UNORM,
             .offset = offsetof(RobbitVertex, normal),
+        },
+        {
+            .location = 3,
+            .binding = 0,
+            .format = VK_FORMAT_R8G8_UNORM,
+            .offset = offsetof(RobbitVertex, u),
         },
     },
 };

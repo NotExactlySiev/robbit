@@ -2,6 +2,7 @@
 #define _MESH_H
 
 #include <types.h>
+//#include "../vulkan/app.h"
 
 // These are the data structs as found in the file
 typedef struct {
@@ -47,6 +48,8 @@ typedef struct {
 
     AlohaVertex *verts;
     void *faces;  // pointer to the start of first group
+
+    //Buffer vert_buffer;
 } AlohaMesh;
 
 typedef struct {

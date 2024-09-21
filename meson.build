@@ -53,13 +53,13 @@ shaders_dep = declare_dependency(sources: shaders_c)
 inc = include_directories(['src/include'])
 
 stb_dep = dependency('stb')
-glfw3_dep = dependency('glfw3')
+sdl2_dep = dependency('SDL2')
 vulkan_dep = dependency('vulkan', static: true)
 
 executable('robbit', sources, 
   include_directories: inc,
   link_args : '-lm',
-  dependencies: [glfw3_dep, vulkan_dep, stb_dep, shaders_dep],
+  dependencies: [sdl2_dep, vulkan_dep, stb_dep, shaders_dep],
   install: true,
   gui_app: true,
 )

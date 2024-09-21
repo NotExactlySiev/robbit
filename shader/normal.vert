@@ -3,9 +3,10 @@
 layout(location=0) in vec3 position;
 layout(location=1) in vec4 vertColor;
 layout(location=2) in vec3 normal;
+layout(location=3) in vec2 texCoord;
 
 layout(location=0) out flat vec3 fragColor;
-layout(location=1) out vec2 texCoord;
+layout(location=1) out vec2 fragTexCoord;
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     float angle;
@@ -31,7 +32,9 @@ void main()
     gl_Position.xy *= 80.;
     gl_Position.z *= 0.05;
     gl_Position.z += 0.4;
-    texCoord = gl_Position.xy;
+    //fragTexCoord = gl_Position.xy;
+    fragTexCoord = texCoord;
     //fragColor = dot(rot*normal, vec3(0., 0., 1.)) * vertColor.rgb;
     fragColor = vertColor.rgb;
+
 }

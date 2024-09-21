@@ -1,13 +1,13 @@
 #include <types.h>
 #include <stdio.h>
-#include <GLFW/glfw3.h>
+#include <SDL.h>
 
 #include "core/common.h"
 #include "core/mesh.h"
 #include "core/level.h"
 #include "vulkan/app.h"
 
-void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, EarNode *objs_node);
+void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, Image teximage);
 Pipeline create_pipeline_points();
 Pipeline create_pipeline_normal();
 
@@ -26,33 +26,32 @@ static void print_content(EarNode *n)
         printf("\t[%s]", str);
 }
 
-static void nop(EarNode *n) {}
-
-GLFWwindow *window;
+SDL_Window *window;
 AlohaMesh meshes_normal[128];
 AlohaMesh meshes_lod[128];
 u16 *clut_data;
 
-u16 **tmp_get_level_textures(EarNode *objs_node, int *w, int *h)
+// this should take in an aloha texture
+Image to_vulkan_image(void *data, u16 *clut)
 {
-    EarNode *clut_node = &objs_node->sub[1];
-    EarNode *tex_node = &objs_node->sub[5];
+    u8 *p = data;
+    u16 w = (p[4] << 8) | (p[5]);
+    u16 h = (p[6] << 8) | (p[7]);
+    u8 *indices = data + 8;
 
-    u8 *p = (uint8_t*) tex_node->buf;
-    u16 _w = (p[4] << 8) | (p[5]);
-    u16 _h = (p[6] << 8) | (p[7]);
-    *w = _w;
-    *h = _h;
-    u8 *indexes = tex_node->buf + 8;
-    u16 *pixels = malloc(_w*_h*sizeof(u16));
-    u16 *clut = clut_node->buf;
-    for (int i = 0; i < _w*_h; i++) {
-        pixels[i] = clut[indexes[i]];
+    u16 pixels[w*h];
+    for (int i = 0; i < w*h; i++) {
+        pixels[i] = clut[indices[i]];
     }
-    
 
-    return pixels;
+    VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+    Image ret = create_image(w, h, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR, flags);
+    image_write(&ret, pixels);
+    return ret;
 }
+
+Image *reps[1 << 21] = {0};
 
 int main(int argc, char **argv)
 {    
@@ -70,10 +69,8 @@ int main(int argc, char **argv)
     fclose(fd);
 
     Ear *ear = ear_decode(buffer, 0);
-    //F(ear);
-    //ear_print(ear->nodes, print_content);
-    ear_print(ear->nodes, nop);
-    return 0;
+    F(ear);
+    ear_print(ear->nodes, print_content);
 
     // find the objects list and level data nodes
     // just fucking terrible code
@@ -135,7 +132,7 @@ int main(int argc, char **argv)
 
     printf("??? entities\n");
 
-    AlohaMesh *house = &meshes_normal[66];
+    AlohaMesh *house = &meshes_lod[66];
     
 
     //EarNode *kiwi_node = &ear->nodes->sub[0];
@@ -154,8 +151,14 @@ int main(int argc, char **argv)
     int nprims = 0;
     RobbitVertex vkverts[2048][3] = {0};
 
+
+
+    //RobbitVertex *v;
+
+    // we need to go per objact, and create its vulkan stuff (descriptor set,
+    // textures etc) and cache them all.
+
     for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
-        //printf("%d %d %d %d\n", f->v0, f->v1, f->v2, f->v3);
         bool tex = !(f->flags1 & 0x8000);
         bool lit = !(f->flags0 & 0x0001);
         
@@ -172,7 +175,38 @@ int main(int argc, char **argv)
             printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
         }
 
-        if (!tex) {
+        if (tex) {
+            u32 tw = f->unk;
+
+
+            int page = (f->flags0 & 0x4) >> 2;
+            printf("PAGE %d ");
+            if (tw != 0xE3000000) {
+                u32 xmask = (tw >> 0) & 0x1F;
+                u32 ymask = (tw >> 5) & 0x1F;
+                u32 x = ((tw >> 10) & 0x1F) << 3;
+                u32 y = ((tw >> 15) & 0x1F) << 3;
+                u32 w = ((~(xmask << 3)) + 1) & 0xFF;
+                u32 h = ((~(ymask << 3)) + 1) & 0xFF;
+                printf("REP %d\t%d\t%d\t%d\t", x, y, w, h);
+
+                u32 key = (tw & 0xFFFFF) | (page << 20);
+                if (reps[key] == NULL) {
+                    printf("NEW!\n");
+                    reps[key] = 1;
+                }
+            }
+            printf("\n");
+
+            vkverts[nprims][0].u = f->tu0;
+            vkverts[nprims][0].v = f->tv0;
+
+            vkverts[nprims][1].u = f->tu1;
+            vkverts[nprims][1].v = f->tv1;
+
+            vkverts[nprims][2].u = f->tu2;
+            vkverts[nprims][2].v = f->tv2;
+        } else {
             vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
         }
 
@@ -192,25 +226,28 @@ int main(int argc, char **argv)
                 printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
             }
 
-            if (!tex) {
+            if (tex) {
+                vkverts[nprims][0].u = f->tu0;
+                vkverts[nprims][0].v = f->tv0;
+
+                vkverts[nprims][1].u = f->tu2;
+                vkverts[nprims][1].v = f->tv2;
+
+                vkverts[nprims][2].u = f->tu3;
+                vkverts[nprims][2].v = f->tv3;
+            } else {
                 vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
             }
             nprims++;
         }
     }
     
-
-    const GLFWvidmode *mode;
-    GLFWmonitor *monitor;
-    
-
-    if (GLFW_FALSE == glfwInit()) return -1;
-
-    // don't create opengl for window, we're gonna be vulkaning
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    window = glfwCreateWindow(640, 480, "cool window", NULL, NULL);
-
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_VULKAN;
+    window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
     create_app(window);
+
+    Image teximg = to_vulkan_image(objs_node->sub[5].buf, objs_node->sub[1].buf);
 
     //Pipeline points_pipe = create_pipeline_points();
 
@@ -225,32 +262,15 @@ int main(int argc, char **argv)
     
     //the_rest(&normal_pipe, house->verts, house->nverts * sizeof(AlohaVertex), NULL, 0);
     //the_rest_normal(&normal_pipe, house->verts, house->nverts * sizeof(AlohaVertex), index_data, 3*sizeof(u16)*nprims);
-    the_rest_normal(&normal_pipe, vkverts, 3 * nprims * sizeof(RobbitVertex), objs_node);
+    the_rest_normal(&normal_pipe, vkverts, 3 * nprims * sizeof(RobbitVertex), teximg);
 
     //destroy_pipeline(points_pipe);
     destroy_pipeline(normal_pipe);
     destroy_app();
 
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    SDL_DestroyWindow(window);
+    SDL_Vulkan_UnloadLibrary();
+    SDL_Quit();
     
     return 0;
 }
-
-
-/*
-
-things that I had to change to do point drawing
-
-the commands recorded to the buffer
-    the buffers I was using
-
-pipeline stuff:
-    the descriptor set and layout
-        no texture, so that part doesn't exist
-    shaders
-    input assembly
-
-if I record the command buffer right in the main loop...
-
-*/

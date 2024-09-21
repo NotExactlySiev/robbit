@@ -1,6 +1,9 @@
+#ifndef _VULKAN_H
+#define _VULKAN_H
+
 #include <string.h>
 #include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
+#include <SDL.h>
 
 #define     MAX_IMAGES  4
 
@@ -44,7 +47,7 @@ typedef struct {
 
 
 // globals
-extern GLFWwindow *window;
+extern SDL_Window *window;
 extern VkInstance inst;
 extern VkPhysicalDevice pdev;
 extern VkDevice ldev;
@@ -71,3 +74,5 @@ void destroy_image(Image b);
 void image_set_layout(Image *img, VkImageLayout old, VkImageLayout new);
 void image_write(Image *img, void *data);
 VkImageView image_create_view(Image img, VkImageAspectFlags aspect);
+
+#endif

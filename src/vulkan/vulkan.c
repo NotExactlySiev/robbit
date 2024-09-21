@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
-#include <GLFW/glfw3.h>
+#include <SDL.h>
 
 #include <string.h>
 
@@ -134,21 +134,23 @@ Swapchain create_swapchain(Surface surface)
     return ret;
 }
 
-void create_app(GLFWwindow *window)
+void create_app(SDL_Window *window)
 {
-    //App ret = {0};
+    int nexts;
+    SDL_Vulkan_GetInstanceExtensions(window, &nexts, NULL);
+    char *exts[nexts];
+    SDL_Vulkan_GetInstanceExtensions(window, &nexts, exts);
 
-    int nglfwexts;
-    const char **glfwexts;
-    glfwexts = glfwGetRequiredInstanceExtensions(&nglfwexts);
+    for (int i = 0; i < nexts; i++)
+        printf("%s\n", exts[i]);
 
     const char *const enabled_layers = "VK_LAYER_KHRONOS_validation";
     VkInstanceCreateInfo createinfo = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .enabledLayerCount = 1,
         .ppEnabledLayerNames = &enabled_layers,
-        .enabledExtensionCount = nglfwexts,
-        .ppEnabledExtensionNames = glfwexts,
+        .enabledExtensionCount = nexts,
+        .ppEnabledExtensionNames = exts,
         .pApplicationInfo = &(VkApplicationInfo) {
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
             .apiVersion = VK_API_VERSION_1_3,
@@ -159,7 +161,7 @@ void create_app(GLFWwindow *window)
     if (VK_SUCCESS != rc)
         printf("can't instance uwu %d\n", rc);
 
-    rc = glfwCreateWindowSurface(inst, window, NULL, &surface); 
+    rc = SDL_Vulkan_CreateSurface(window, inst, &surface);
     if (VK_SUCCESS != rc)
         printf("can't surface uwu %d\n", rc);
 
@@ -377,23 +379,13 @@ Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h)
     return ret;
 }
 
-
-//void the_rest_normal(Pipeline *pipe, AlohaVertex *vert_data, int vert_size, u16 *index_data, int index_size)
-void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, void *objs_node)
+void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, Image teximage)
 {
-    // get the texture
-    int texWidth;
-    int texHeight;
-    int ntex;
-    VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    u16 *textures = tmp_get_level_textures(objs_node, &texWidth, &texHeight);
-    printf("%d %d\n", texWidth, texHeight);
-    Image teximage = create_image(texWidth, texHeight, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR, flags);
-    image_write(&teximage, textures);
+    image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
-    texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
+    //Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
+    //texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
 
 
     VkSampler sampler;
@@ -448,7 +440,7 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, voi
         uniform_buffers[i] = create_buffer(4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(ldev, uniform_buffers[i].mem, 0, 1, 0, &ubo_colors[i]);
         // POINTS
-        VkWriteDescriptorSet writes[2] = { 
+        VkWriteDescriptorSet writes[2] = {
             {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = desc_sets[i],
@@ -515,8 +507,11 @@ void the_rest_normal(Pipeline *pipe, RobbitVertex *vert_data, int vert_size, voi
             .renderPass = pipe->pass,       // begin THIS renderpass
             .framebuffer = framebuffers[i], // with THESE atachments
             .renderArea.extent = surface.cap.currentExtent,
-            .clearValueCount = 1,
-            .pClearValues = &(VkClearValue) {0.0f, 0.0f, 0.0f, 0.0f},
+            .clearValueCount = 2,
+            .pClearValues = (VkClearValue[])  {
+                {   .color = {0.0f, 0.0f, 0.0f, 0.0f} },
+                {   .depthStencil = { .depth = 0.0f } },
+            },
         };
 
         
@@ -560,7 +555,7 @@ void destroy_pipeline(Pipeline pipe)
     vkDestroyShaderModule(ldev, pipe.frag_shader, NULL);
 }
 
-void present_loop(GLFWwindow *window, VkCommandBuffer cmdbufs[], float *ubo_colors[])
+void present_loop(SDL_Window *window, VkCommandBuffer cmdbufs[], float *ubo_colors[])
 {
     // make the semaphore
     VkSemaphoreCreateInfo semp_info = {
@@ -581,10 +576,24 @@ void present_loop(GLFWwindow *window, VkCommandBuffer cmdbufs[], float *ubo_colo
         vkCreateSemaphore(ldev, &semp_info, NULL, &semps_rend_fin[i]); 
     }
 
+    bool running = true;
     float t = 0.0;
     int current_frame = 0;
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+    float zoom = 3.f;
+    while (running) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            //ui_process_event(&event);
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_ESCAPE)
+                    running = 0;
+            } else if (event.type == SDL_MOUSEWHEEL) {
+                zoom += 0.07 * event.wheel.preciseY;
+                if (zoom < 0.2) zoom = 0.2;                
+            } else if (event.type == SDL_QUIT) {
+                running = 0;
+            }
+        }
 
         vkWaitForFences(ldev, 1 ,&queue_fences[current_frame], VK_TRUE, UINT64_MAX);
         vkResetFences(ldev, 1, &queue_fences[current_frame]);
@@ -623,6 +632,7 @@ void present_loop(GLFWwindow *window, VkCommandBuffer cmdbufs[], float *ubo_colo
         };
 
 	    vkQueuePresentKHR(queue, &present_info);
+        SDL_GL_SwapWindow(window);
         current_frame = (current_frame + 1) % max_frames;
     }
 

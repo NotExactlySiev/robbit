@@ -69,39 +69,29 @@ int main(int argc, char **argv)
     fclose(fd);
 
     Ear *ear = ear_decode(buffer, 0);
-    F(ear);
-    ear_print(ear->nodes, print_content);
-
-    // find the objects list and level data nodes
-    // just fucking terrible code
-    EarNode *objs_node = NULL;
-    for (EarNode *np = ear->nodes->sub + 4; np->type != EAR_NODE_TYPE_SEPARATOR; np++) {
-        if (np->type == EAR_NODE_TYPE_DIR && aloha(np)->content == EAR_CONTENT_ENTITY) {
-            objs_node = np;
-            break;
-        }
+    DatFile parsed = {0};
+    if (aloha_parse_dat(&parsed, ear->nodes) != 0) {
+        printf("parse failed\n");
+        exit(EXIT_FAILURE);
     }
 
-    EarNode *stage_node = NULL;
-    for (EarNode *np = ear->nodes->sub + 4; np; np++) {
-        if (np->type == EAR_NODE_TYPE_DIR && aloha(np)->content == EAR_CONTENT_STAGE) {
-            stage_node = np;
-            break;
-        }
-    }
+    AlohaLevel *level = &parsed.levels[0];
+    // TODO: make these structures consistent so a node is always at .node
+    EarNode *objs_node = level->objs.node;
+    EarNode *geom_node = level->stage.geom;
 
-    EarNode *geom_node = &stage_node->sub[2];
-
-    printf("objs node is %d\n", objs_node - ear->nodes);
-    printf("geom node is %d\n", stage_node - ear->nodes);
+    printf("objs node is %d\n",  objs_node - ear->nodes);
+    printf("stage node is %d\n", geom_node - ear->nodes);
 
     // parsing and converting objs. first: is lod a subset of normal?
-    clut_data = aloha(objs_node)->model.mesh_clut->buf;
-    
-    mesh_file_parse(objs_node->sub[2].buf, meshes_normal);
-    mesh_file_parse(objs_node->sub[3].buf, meshes_lod);
+    clut_data = level->objs.mesh_clut->buf;
+    // FIXME: this should be a single function call taking an AlohaObjSet
+    mesh_file_parse(level->objs.meshes[0]->buf, meshes_normal);
+    mesh_file_parse(level->objs.meshes[1]->buf, meshes_lod);
 
-    /*for (int i = 0; i < 128; i++) {
+    
+
+    for (int i = 0; i < 128; i++) {
         printf("%03d:\t", i);
         if (meshes_normal[i].empty)
             printf("---\t");
@@ -123,8 +113,10 @@ int main(int argc, char **argv)
             if (lod) printf("!!! Only LOD");
         }
         printf("\n");
-    }*/
+    }
 
+
+    
     int nobjs = geom_count(geom_node->buf);
     printf("%d objects\n", nobjs);
     Thing objs[nobjs];

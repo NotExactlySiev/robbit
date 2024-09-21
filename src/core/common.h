@@ -7,6 +7,7 @@
 #include "../exact/archive.h"
 //#include <SDL.h>
 //#include "image.h"
+#include "mesh.h"
 
 
 #define READ_BE32(x,p)  { (x) = *p++ << 24; x |= *p++ << 16; x |= *p++ << 8; x |= *p++ << 0; }
@@ -42,24 +43,49 @@ typedef struct AssetViewer AssetViewer;
 
 typedef struct {
     EarContent  content;
-    union {
-        // Model
-        struct {
-            EarNode *mesh;
-            EarNode *mesh_lod;
-            EarNode *mesh_clut;
-            EarNode *texture[2];
-        } model;
-
-        struct {
-            EarNode *clut;
-        } texture;
-    };
     // gui stuff
     bool show_viewer;
     AssetViewer *viewer;
 } AlohaMetadata;
 
+typedef struct {
+    EarNode *clut_node;
+    EarNode *bitmap_node;
+} AlohaTexture;
+
+typedef struct {
+    EarNode *clut_node;
+    EarNode *mesh_nodes[2];
+    AlohaTexture tex[2];    // clut ref is duplicated, who cares
+
+    EarNode *node;
+} AlohaObjSet;
+
+typedef struct {
+    EarNode *geom_node;
+
+    EarNode *node;
+} AlohaStage;
+
+typedef struct {
+    AlohaObjSet objs;
+    AlohaStage stage;
+} AlohaLevel;
+
+typedef struct {
+    AlohaTexture env[2];
+    AlohaLevel levels[2];
+    EarNode *unk_node;       // TODO: what is this?
+
+    EarNode *node;
+} DatFile;
+
+#define ENE_MAX_OBJS    16
+
+typedef struct {
+    int nobjs;
+    AlohaObjSet objs[ENE_MAX_OBJS];
+} EneFile;
 
 // these should be in aloha.h?
 AlohaMetadata *aloha(EarNode *node);

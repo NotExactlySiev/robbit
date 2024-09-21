@@ -58,7 +58,6 @@ static EarNodeType find_type(void *data)
 // makes ear by parsing the data. ear must have enough space allocated
 Ear *ear_decode(void *data, u32 size)
 {
-
     Ear *ret = malloc(sizeof(u32) + EAR_MAX_NODES*sizeof(EarNode));
     EarNode *tmp = ret->nodes;
     int i,j;

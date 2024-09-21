@@ -29,7 +29,4 @@ typedef uint64_t        u64;
 
 // No other weird C99 intmax_least_t whatever stuff. I've never used them.
 
-// Generic function pointer (use instead of void*)
-typedef int (*func)();
-
 #endif

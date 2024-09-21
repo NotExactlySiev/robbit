@@ -54,12 +54,6 @@ typedef struct {
 } RobbitMesh;
 
 typedef struct {
-    RobbitMesh normal;
-    RobbitMesh lod;
-} RobbitObj;
-
-
-typedef struct {
     u8 r, g, b;
 } _Color;
 

@@ -254,18 +254,6 @@ Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h)
     return ret;
 }
 
-typedef struct {
-    VkRenderPass pass;
-    VkSemaphore semps_img_avl[4];
-    VkSemaphore semps_rend_fin[4];
-    VkFence queue_fences[4];
-    VkFramebuffer framebuffers[4];
-    VkCommandBuffer cmdbufs[4];
-    VkCommandBuffer current_cmdbuf;
-    int current_frame;
-    uint32_t image_index;
-} PresentContext;
-
 void present_init(PresentContext *ctx, VkRenderPass pass);
 void present_terminate(PresentContext *ctx);
 void present_acquire(PresentContext *ctx);
@@ -274,139 +262,6 @@ void present_end_pass(PresentContext *ctx);
 VkCommandBuffer present_begin_pass(PresentContext *ctx);
 
 
-void the_rest_normal(Pipeline *pipe, RobbitObjSet *objs)
-{
-    //image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    //VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    //Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
-    //texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
-
-
-    VkSampler sampler;
-    vkCreateSampler(ldev, &(VkSamplerCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .magFilter = VK_FILTER_NEAREST,
-        .minFilter = VK_FILTER_NEAREST,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-    }, NULL, &sampler);
-
-    VkDescriptorSet desc_sets[max_frames];
-    vkAllocateDescriptorSets(ldev, &(VkDescriptorSetAllocateInfo){
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = descpool,
-        .descriptorSetCount = 4,
-        .pSetLayouts = (VkDescriptorSetLayout[]) { pipe->set, pipe->set, pipe->set, pipe->set },
-    }, &desc_sets);
-
-    Buffer uniform_buffers[max_frames];
-    float *ubo_colors[max_frames];
-
-    // and bind them to the resources. fuck this shit
-    for (size_t i = 0; i < max_frames; i++) {
-        uniform_buffers[i] = create_buffer(4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        vkMapMemory(ldev, uniform_buffers[i].mem, 0, 1, 0, &ubo_colors[i]);
-        // POINTS
-        VkWriteDescriptorSet writes[2] = {
-            {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = desc_sets[i],
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .descriptorCount = 1,
-                .pBufferInfo = &(VkDescriptorBufferInfo[]) {
-                    {
-                        .buffer = uniform_buffers[i].vk,
-                        .offset = 0,
-                        .range = 4,
-                    }
-                },
-            },
-            /*{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = desc_sets[i],
-                .dstBinding = 1,
-                .dstArrayElement = 0,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptorCount = 1,
-                .pImageInfo = &(VkDescriptorImageInfo[]) {
-                    {
-                        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        .imageView = texview,
-                        .sampler = sampler,
-                    },
-                },
-            },*/
-        };
-
-        vkUpdateDescriptorSets(ldev, 1, writes, 0, NULL);
-    }
-
-
-    // ### buffer comes in from the caller, who also records
-    //Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    //Buffer index_buf = create_buffer(index_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    //buffer_write(vert_buf, vert_size, vert_data);
-    //buffer_write(index_buf, index_size, index_data);
-
-    PresentContext ctx = {0};
-    present_init(&ctx, pipe->pass);
-
-    bool running = true;
-    float t = 0.0;
-    int current_frame = 0;
-    float zoom = 3.f;
-    while (running) {
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            //ui_process_event(&event);
-            if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE)
-                    running = 0;
-            } else if (event.type == SDL_MOUSEWHEEL) {
-                zoom += 0.07 * event.wheel.preciseY;
-                if (zoom < 0.2) zoom = 0.2;                
-            } else if (event.type == SDL_QUIT) {
-                running = 0;
-            }
-        }
-
-        t += 0.05;
-        *ubo_colors[ctx.image_index] = t;
-
-        present_acquire(&ctx);
-        VkCommandBuffer cbuf = present_begin_pass(&ctx);
-
-        vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->vk);        
-        vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe->layout, 0, 1, &desc_sets[ctx.image_index], 0, NULL);
-        VkDeviceSize offset = 0;
-        
-        vkCmdBindVertexBuffers(cbuf, 0, 1, &objs->lod[66].vert_buffer.vk, &offset);
-        //vkCmdBindVertexBuffers(cbuf, 0, 1, &vert_buf.vk, &offset);
-        vkCmdDraw(cbuf, objs->lod[66].vert_count, 1, 0, 0);
-
-        present_end_pass(&ctx);
-        present_submit(&ctx);
-    }
-
-    present_terminate(&ctx);
-    // POINTS
-    //destroy_image(teximage);
-    //destroy_buffer(vert_buf);
-    //destroy_buffer(index_buf);
-    
-    // destroy_swapchain
-    /*for (int i = 0; i < swapchain.nimages; i++) {
-        vkDestroyFramebuffer(ldev, framebuffers[i], NULL);
-    }*/
-
-    for (int i = 0; i < max_frames; i++) {
-        destroy_buffer(uniform_buffers[i]);
-    }
-}
 
 void destroy_pipeline(Pipeline pipe)
 {
@@ -421,12 +276,12 @@ void destroy_pipeline(Pipeline pipe)
 void present_init(PresentContext *ctx, VkRenderPass pass)
 {
     ctx->pass = pass;
-    Image zimage = create_image(
+    ctx->zimage = create_image(
         surface.cap.currentExtent.width,
         surface.cap.currentExtent.height,
         VK_FORMAT_D32_SFLOAT,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    VkImageView zview = image_create_view(zimage, VK_IMAGE_ASPECT_DEPTH_BIT);
+    VkImageView zview = image_create_view(ctx->zimage, VK_IMAGE_ASPECT_DEPTH_BIT);
     for (size_t i = 0; i < swapchain.nimages; i++) {
         VkFramebufferCreateInfo framebuffer_info = {
             .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -478,6 +333,7 @@ void present_terminate(PresentContext *ctx)
         vkDestroySemaphore(ldev, ctx->semps_rend_fin[i], NULL);
         vkDestroyFence(ldev, ctx->queue_fences[i], NULL);
     }
+    destroy_image(ctx->zimage);
 }
 
 void present_acquire(PresentContext *ctx)

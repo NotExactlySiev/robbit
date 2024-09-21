@@ -1,11 +1,5 @@
 #version 450
 
-/*
-vec3 colors[1] = vec3[](
-    vec3(1.0, 1.0, 1.0)
-);
-*/
-
 layout(location=0) in vec3 position;
 
 layout(location=0) out float fragColor;
@@ -13,6 +7,7 @@ layout(location=1) out vec2 texCoord;
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     float color;
+    vec3 trans;
 };
 
 void main() {
@@ -26,7 +21,8 @@ void main() {
 
     //gl_Position = rotation*vec4(position*0.05, 1.0);
     texCoord = position.xy;
-    gl_Position = vec4(position*20.0f, 1.0);
+    gl_Position = vec4((position + trans*20.f)*20.0f, 1.0);
+    
     //fragColor = vec3(color);
     //fragColor = color;
     fragColor = 1.0f;

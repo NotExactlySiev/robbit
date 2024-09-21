@@ -49,6 +49,19 @@ typedef struct {
     VkFormat format;
 } VertexAttr;
 
+typedef struct {
+    VkRenderPass pass;
+    VkSemaphore semps_img_avl[4];
+    VkSemaphore semps_rend_fin[4];
+    VkFence queue_fences[4];
+    VkFramebuffer framebuffers[4];
+    VkCommandBuffer cmdbufs[4];
+    VkCommandBuffer current_cmdbuf;
+    Image zimage;
+    int current_frame;
+    uint32_t image_index;
+} PresentContext;
+
 // globals
 extern SDL_Window *window;
 extern VkInstance inst;
@@ -57,6 +70,7 @@ extern VkDevice ldev;
 extern VkQueue queue;  // ASSUMES: only one    
 extern Surface surface;
 extern Swapchain swapchain;
+extern VkDescriptorPool descpool;
 
 // pools
 extern VkCommandPool cmdpool;

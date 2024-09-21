@@ -87,6 +87,10 @@ typedef struct {
 // those get parsed into these:
 
 typedef struct {
+    // holds the Image and all the possibly required subiamges
+} RobbitTexture;
+
+typedef struct {
     RobbitMesh normal[128];
     RobbitMesh lod[128];
 } RobbitObjSet;

@@ -22,12 +22,15 @@ const char* content_strings[] = {
 SDL_Window *window;
 
 // this should take in an aloha texture
-Image to_vulkan_image(void *data, u16 *clut)
+//Image to_vulkan_image(void *data, u16 *clut)
+Image to_vulkan_image(AlohaTexture *src)
 {
-    u8 *p = data;
+    void *bitmap = src->bitmap_node->buf;
+    u16 *clut = src->clut_node->buf;
+    u8 *p = bitmap;
     u16 w = (p[4] << 8) | (p[5]);
     u16 h = (p[6] << 8) | (p[7]);
-    u8 *indices = data + 8;
+    u8 *indices = bitmap + 8;
 
     u16 pixels[w*h];
     for (int i = 0; i < w*h; i++) {
@@ -81,9 +84,7 @@ int main(int argc, char **argv)
 
     RobbitLevel level = {0};
     convert_level(&level, &parsed.levels[0]);
-    
-
-    //Image teximg = to_vulkan_image(objs_node->sub[5].buf, objs_node->sub[1].buf);
+    dump_objset(&level.objs);
 
     // convert to the format vulkan likes
     // TODO: should the conversion be a two step process? first flatten the mesh
@@ -94,17 +95,22 @@ int main(int argc, char **argv)
         { 0,                                VK_FORMAT_R16G16B16_SNORM },
         { offsetof(RobbitVertex, col),      VK_FORMAT_R8G8B8_UNORM },
         { offsetof(RobbitVertex, normal),   VK_FORMAT_R16G16B16_UNORM },
+        { offsetof(RobbitVertex, tex),      VK_FORMAT_R8G8_UINT },
         { offsetof(RobbitVertex, u),        VK_FORMAT_R8G8_UNORM },
     };
     int nattrs = sizeof(vert_attrs)/sizeof(*vert_attrs);
     Pipeline pipe = create_pipeline(sizeof(RobbitVertex), vert_attrs, nattrs);
     
-    /*
+    RobbitTexture texture = {
+        .n = 0,
+    };
+    //texture.images[0] = 
+    Image teximage = to_vulkan_image(&parsed.levels->objs.tex[0]);
     image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
-    texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
+    //Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
+    //texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
 
     VkSampler sampler;
     vkCreateSampler(ldev, &(VkSamplerCreateInfo){
@@ -115,9 +121,10 @@ int main(int argc, char **argv)
         .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
     }, NULL, &sampler);
-    */
+    
     typedef struct {
         float angle;
+        float zoom;
         //float x, y, z;
     } Uniform;
 
@@ -158,7 +165,7 @@ int main(int argc, char **argv)
                     }
                 },
             },
-            /*{
+            {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = desc_sets[i],
                 .dstBinding = 1,
@@ -172,10 +179,10 @@ int main(int argc, char **argv)
                         .sampler = sampler,
                     },
                 },
-            },*/
+            },
         };
 
-        vkUpdateDescriptorSets(ldev, 1, writes, 0, NULL);
+        vkUpdateDescriptorSets(ldev, 2, writes, 0, NULL);
     }
 
     PresentContext ctx = {0};
@@ -183,7 +190,7 @@ int main(int argc, char **argv)
 
     bool running = true;
     float t = 0.0;
-    float zoom = 3.f;
+    float zoom = 5.f;
 
     while (running) {
         SDL_Event event;
@@ -193,7 +200,7 @@ int main(int argc, char **argv)
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     running = 0;
             } else if (event.type == SDL_MOUSEWHEEL) {
-                zoom += 0.07 * event.wheel.preciseY;
+                zoom += 0.18 * event.wheel.preciseY;
                 if (zoom < 0.2) zoom = 0.2;                
             } else if (event.type == SDL_QUIT) {
                 running = 0;
@@ -202,6 +209,7 @@ int main(int argc, char **argv)
 
         t += 0.02;
         uniforms[ctx.image_index]->angle = t;
+        uniforms[ctx.image_index]->zoom = zoom;
 
         present_acquire(&ctx);
         VkCommandBuffer cbuf = present_begin_pass(&ctx);

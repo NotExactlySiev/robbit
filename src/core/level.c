@@ -96,12 +96,12 @@ void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
 {
     for (int i = 0; i < level->stage.geom.n; i++) {
         GeomObj *obj = &level->stage.geom.objs[i];
-        if (level->objs.lod[obj->id].empty) continue;
+        if (level->objs.normal[obj->id].empty) continue;
         push_const(cbuf, pipe, (PushConst) {
             .x = ((float) obj->x) / INT16_MAX,
             .y = ((float) obj->y) / INT16_MAX,
             .z = ((float) obj->z) / INT16_MAX,
         });
-        draw_mesh(cbuf, &level->objs.lod[obj->id]);
+        draw_mesh(cbuf, &level->objs.normal[obj->id]);
     }
 }

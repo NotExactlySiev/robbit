@@ -85,6 +85,8 @@ typedef struct {
 
 typedef struct {
     // holds the Image and all the possibly required subiamges
+    uint n;
+    Image images[32];
 } RobbitTexture;
 
 typedef struct {
@@ -95,7 +97,7 @@ typedef struct {
 #define STAGE_MAX_GEOM  1024
 
 typedef struct {
-    int n;
+    uint n;
     GeomObj objs[STAGE_MAX_GEOM];
 } RobbitGeom;
 
@@ -110,6 +112,7 @@ typedef struct {
 typedef struct {
     RobbitMesh normal[128];
     RobbitMesh lod[128];
+    RobbitTexture texture;
 } RobbitObjSet;
 
 typedef struct {

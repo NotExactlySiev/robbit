@@ -147,12 +147,14 @@ static int extract_faces(AlohaFace *dst, RobbitMesh *mesh)
 
 void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
 {
+    //if (mesh->vert_buffer.vk == VK_NULL_HANDLE) return;
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cbuf, 0, 1, &mesh->vert_buffer.vk, &offset);
     vkCmdDraw(cbuf, mesh->vert_count, 1, 0, 0);
 }
 
 // TODO: right now this only converts the LOD
+// TODO: this is fucking horrible lol. so much repeat
 void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
 {
     u8 reps[1 << 21] = {0};
@@ -162,7 +164,7 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
     parse_file(src->mesh_nodes[1]->buf, set->lod);
     
     for (int i = 0; i < 128; i++) {
-        RobbitMesh *m = &set->lod[i];
+        RobbitMesh *m = &set->normal[i];
         if (m->empty) continue;
         int nfaces = extract_faces(NULL, m);
         AlohaFace faces[nfaces];
@@ -186,6 +188,7 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                 printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
             }
 
+            vkverts[nprims][0].tex = tex;
             if (tex) {
                 u32 tw = f->unk;
                 int page = (f->flags0 & 0x4) >> 2;
@@ -205,6 +208,10 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                         reps[key] = ntex++;
                         // TODO: create the texture here, and cache it
                     }
+
+                    vkverts[nprims][0].texid = reps[key];
+                } else {
+                    vkverts[nprims][0].texid = page;
                 }
 
                 vkverts[nprims][0].u = f->tu0;

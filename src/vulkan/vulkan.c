@@ -324,7 +324,7 @@ VkCommandBuffer present_begin_pass(PresentContext *ctx)
         .renderArea.extent = surface.cap.currentExtent,
         .clearValueCount = 2,
         .pClearValues = (VkClearValue[])  {
-            { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } },
+            { .color = { .float32 = { 0.2f, 0.9f, 0.2f, 0.0f } } },
             { .depthStencil = { .depth = 0.0f } },
         },
     }, VK_SUBPASS_CONTENTS_INLINE);

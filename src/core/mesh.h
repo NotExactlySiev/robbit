@@ -48,6 +48,8 @@ typedef struct {
     AlohaVertex *verts;
     void *faces;  // pointer to the start of first group
 
+    // TODO: split this in two?
+
     Buffer vert_buffer;
     u32 vert_count;
 } RobbitMesh;
@@ -64,6 +66,7 @@ typedef struct {
 typedef struct {
     AlohaVertex pos;
     NormalVec normal;
+    u8 tex, texid;
     u8 u, v;
     _Color col;
 } RobbitVertex;

@@ -40,60 +40,86 @@ EarContent ear_node_guess_content(EarNode* node);
 typedef struct AssetViewer AssetViewer;
 // userdata struct allocated for each EarNode
 
+/*
 typedef struct {
     EarContent  content;
     // gui stuff
     bool show_viewer;
     AssetViewer *viewer;
 } AlohaMetadata;
+*/
 
 typedef struct {
+    // doesn't have a node of its own, abstract object
     EarNode *clut_node;
     EarNode *bitmap_node;
 } AlohaTexture;
 
 typedef struct {
+    EarNode *node;
     EarNode *clut_node;
     EarNode *mesh_nodes[2];
     AlohaTexture tex[2];    // clut ref is duplicated, who cares
-
-    EarNode *node;
 } AlohaObjSet;
 
 typedef struct {
-    EarNode *geom_node;
-
     EarNode *node;
+} AlohaGeom;
+
+typedef struct {
+    EarNode *node;
+    AlohaGeom *geom;
 } AlohaStage;
 
 typedef struct {
+    EarNode *node;
     AlohaObjSet objs;
     AlohaStage stage;
 } AlohaLevel;
 
 typedef struct {
+    EarNode *node;
     AlohaTexture env[2];
     AlohaLevel levels[2];
     EarNode *unk_node;       // TODO: what is this?
-
-    EarNode *node;
 } DatFile;
 
 typedef struct {
+    EarNode *node;
     int nobjs;
     AlohaObjSet objs[ENE_MAX_OBJS];
 } EneFile;
 
-// those get parsed into these:
+// those get converted into these:
 
 typedef struct {
     // holds the Image and all the possibly required subiamges
 } RobbitTexture;
 
 typedef struct {
+    u16 id;
+    i16 x, y, z;
+} GeomObj;
+
+#define STAGE_MAX_GEOM  1024
+
+typedef struct {
+    GeomObj geom[STAGE_MAX_GEOM];
+    // RobbitEntity[]
+    // RobbitCollisions[]
+    // decorations
+    // the other thing
+} RobbitStage;
+
+typedef struct {
     RobbitMesh normal[128];
     RobbitMesh lod[128];
 } RobbitObjSet;
+
+typedef struct {
+    RobbitObjSet objs;
+    RobbitStage stage;
+} RobbitLevel;
 
 
 #endif

@@ -207,6 +207,30 @@ void dump_objset(RobbitObjSet *set)
     }
 }
 
+void die(const char *msg)
+{
+    printf("%s\n", msg);
+    exit(EXIT_FAILURE);
+}
+
+void convert_geom(GeomObj *dst, AlohaGeom *src)
+{
+    int nobjs = geom_count(geom_node->buf);
+    if (nobjs > STAGE_MAX_GEOM) {
+        die("too many stage geometry objects");
+    }
+    //printf("%d objects\n", nobjs);
+    //Thing levelobjs[nobjs];
+    geom_unpack(geom_node->buf, levelobjs);
+}
+
+void convert_stage(RobbitStage *dst, AlohaStage *src)
+{
+    convert_geom(dst->geom, src->geom);
+    // TODO: other parts
+    /**/
+}
+
 extern uint32_t max_frames;
 
 int main(int argc, char **argv)
@@ -244,15 +268,15 @@ int main(int argc, char **argv)
     window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
     create_app(window);
 
-    RobbitObjSet objset;
-    convert_objset(&objset, &level->objs);
-    dump_objset(&objset);
-
+    RobbitLevel converted_level = {0};
     
-    int nobjs = geom_count(geom_node->buf);
-    printf("%d objects\n", nobjs);
-    Thing levelobjs[nobjs];
-    geom_unpack(geom_node->buf, levelobjs);
+    //RobbitObjSet objset;
+
+    convert_objset(&converted_level.objs, &level->objs);
+    dump_objset(&converted_level.objs);
+
+    convert_stage(&converted_level.stage, &level->stage);
+    
 
     Image teximg = to_vulkan_image(objs_node->sub[5].buf, objs_node->sub[1].buf);
 
@@ -379,7 +403,7 @@ int main(int argc, char **argv)
         vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[ctx.image_index], 0, NULL);
         
         for (int i = 0; i < nobjs; i++) {
-            if (objset.lod[levelobjs[i].id].empty) continue;
+            if (converted_level.objs.lod[levelobjs[i].id].empty) continue;
             struct {
                 float x, y, z;
             } pos = {
@@ -388,7 +412,7 @@ int main(int argc, char **argv)
                 .z = ((float) levelobjs[i].z) / INT16_MAX,
             };
             vkCmdPushConstants(cbuf, pipe.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pos), &pos);
-            draw_mesh(cbuf, &objset.lod[levelobjs[i].id]);
+            draw_mesh(cbuf, &converted_level.objs.lod[levelobjs[i].id]);
         }
         
 

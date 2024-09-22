@@ -15,12 +15,6 @@ typedef struct {
     Obj* ptrs[];
 } Section3;
 
-
-typedef struct {
-    uint16_t id;
-    short x,y,z;
-} Thing;
-
 typedef struct {
     int w, h;
     short sizes[64][64];  // i don't think it's ever bigger than this

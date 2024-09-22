@@ -8,6 +8,8 @@
 #include "../exact/archive.h"
 #include "mesh.h"
 
+#include <assert.h>
+
 // put this in common.h for ALL modules (not just core)
 static inline void die(const char *msg)
 {
@@ -26,10 +28,6 @@ static inline void die(const char *msg)
     O(TEXTURE, Texture, texture)    \
     O(MESH, Mesh, mesh)             \
     O(TILED, Tiled, tiled)          \
-    O(ENTITY, Entity, entity)       \
-    \
-    O(STAGE, Stage, stage)       \
-
 
 
 //typedef enum EarContent EarContent;

@@ -67,9 +67,7 @@ int main(int argc, char **argv)
     size_t filesize = ftell(fd);
     u8 *buffer = malloc(filesize);
     fseek(fd, 0, SEEK_SET);
-    if (fread(buffer, 1, filesize, fd) != filesize) {
-        die("file read failed");
-    }
+    assert(fread(buffer, 1, filesize, fd) == filesize);
     fclose(fd);
 
     Ear *ear = ear_decode(buffer, 0);
@@ -101,7 +99,6 @@ int main(int argc, char **argv)
     int nattrs = sizeof(vert_attrs)/sizeof(*vert_attrs);
     Pipeline pipe = create_pipeline(sizeof(RobbitVertex), vert_attrs, nattrs);
     
-    //the_rest_normal(&pipe, &objset);
     /*
     image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);

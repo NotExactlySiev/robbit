@@ -213,6 +213,14 @@ Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = 1,
         .pSetLayouts = &ret.set,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = (VkPushConstantRange[]) {
+            {
+                .offset = 0,
+                .size = 3 * sizeof(float),
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            }
+        }
     };
     vkCreatePipelineLayout(ldev, &pipeline_layout_info, NULL, &ret.layout);
 

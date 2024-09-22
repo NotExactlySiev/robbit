@@ -2,7 +2,6 @@
 #define _LEVEL_H
 
 #include "common.h"
-//#include "image.h"
 
 typedef struct {
     short unk0, unk1;

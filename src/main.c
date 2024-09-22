@@ -60,6 +60,8 @@ void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
     vkCmdDraw(cbuf, mesh->vert_count, 1, 0, 0);
 }
 
+
+
 void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
 {
     u16 *clut_data = src->clut_node->buf;
@@ -288,7 +290,7 @@ int main(int argc, char **argv)
     */
     typedef struct {
         float angle;
-        float x, y, z;
+        //float x, y, z;
     } Uniform;
 
     VkDescriptorSet desc_sets[max_frames];
@@ -306,7 +308,6 @@ int main(int argc, char **argv)
     for (int i = 0; i < max_frames; i++) {
         uniform_buffers[i] = create_buffer(sizeof(Uniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(ldev, uniform_buffers[i].mem, 0, sizeof(Uniform), 0, &uniforms[i]);
-        // POINTS
         VkWriteDescriptorSet writes[2] = {
             {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -350,6 +351,7 @@ int main(int argc, char **argv)
     float t = 0.0;
     int current_frame = 0;
     float zoom = 3.f;
+
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -365,9 +367,9 @@ int main(int argc, char **argv)
             }
         }
 
-        t += 0.05;
+        t += 0.02;
+
         uniforms[ctx.image_index]->angle = t;
-        //uniforms[ctx.image_index]->x = t*0.001;
 
         present_acquire(&ctx);
         VkCommandBuffer cbuf = present_begin_pass(&ctx);
@@ -377,11 +379,15 @@ int main(int argc, char **argv)
         vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[ctx.image_index], 0, NULL);
         
         for (int i = 0; i < nobjs; i++) {
-            //draw_mesh(objs[i], pixels);
-            //draw_mesh(cbuf, &objset.lod[i]);
-            //uniforms[ctx.image_index]->x = ((float) levelobjs[i].x) / INT16_MAX;
-            //uniforms[ctx.image_index]->y = ((float) levelobjs[i].y) / INT16_MAX;
-            //uniforms[ctx.image_index]->z = ((float) levelobjs[i].z) / INT16_MAX;
+            if (objset.lod[levelobjs[i].id].empty) continue;
+            struct {
+                float x, y, z;
+            } pos = {
+                .x = ((float) levelobjs[i].x) / INT16_MAX,
+                .y = ((float) levelobjs[i].y) / INT16_MAX,
+                .z = ((float) levelobjs[i].z) / INT16_MAX,
+            };
+            vkCmdPushConstants(cbuf, pipe.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pos), &pos);
             draw_mesh(cbuf, &objset.lod[levelobjs[i].id]);
         }
         

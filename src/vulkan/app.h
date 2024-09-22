@@ -75,7 +75,11 @@ extern VkDescriptorPool descpool;
 // pools
 extern VkCommandPool cmdpool;
 
+void create_app(SDL_Window *window);
+void destroy_app(void);
+
 Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs);
+void destroy_pipeline(Pipeline pipe);
 
 VkCommandBuffer begin_tmp_cmdbuf(void);
 void end_tmp_cmdbuf(VkCommandBuffer buf);
@@ -92,5 +96,12 @@ void destroy_image(Image b);
 void image_set_layout(Image *img, VkImageLayout old, VkImageLayout new);
 void image_write(Image *img, void *data);
 VkImageView image_create_view(Image img, VkImageAspectFlags aspect);
+
+void present_init(PresentContext *ctx, VkRenderPass pass);
+void present_terminate(PresentContext *ctx);
+void present_acquire(PresentContext *ctx);
+void present_submit(PresentContext *ctx);
+void present_end_pass(PresentContext *ctx);
+VkCommandBuffer present_begin_pass(PresentContext *ctx);
 
 #endif

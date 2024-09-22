@@ -1,5 +1,6 @@
 #include "app.h"
 #include "../core/mesh.h"
+#include "../core/common.h"
 #include <stdio.h>
 
 static VkAttachmentDescription default_color_attachment_desc = {
@@ -56,34 +57,28 @@ VkPipelineColorBlendStateCreateInfo default_colorblend_info = {
 
 static VkShaderModule create_shader_module(const char *file)
 {
-    VkResult rc;
-    FILE *fd;
-    size_t fsize;
-    uint32_t *buf;
-
-    fd = fopen(file, "r");
+    FILE *fd = fopen(file, "r");
     fseek(fd, 0, SEEK_END);
-    fsize = ftell(fd);
+    size_t fsize = ftell(fd);
     fseek(fd, 0, SEEK_SET);
-    buf = malloc(fsize);
+    // TODO: reading it like this might cause an issue
+    u32 *buf = malloc(fsize);
     if (fsize != fread(buf, 1, fsize, fd)) {
-        return NULL;
+        die("shader file read failed");
     }
 
     VkShaderModule shader;
-    VkShaderModuleCreateInfo shaderc = {
+    vkCreateShaderModule(ldev, &(VkShaderModuleCreateInfo) {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = fsize,
         .pCode = buf, 
-    };
-
-    vkCreateShaderModule(ldev, &shaderc, NULL, &shader);
+    }, NULL, &shader);
 
     free(buf);
     return shader;
 }
 
-static create_default_renderpass(VkRenderPass *pass)
+static void create_default_renderpass(VkRenderPass *pass)
 {
     VkSubpassDescription subp_descp = {
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -94,12 +89,9 @@ static create_default_renderpass(VkRenderPass *pass)
                 .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             },
         },
-        .pDepthStencilAttachment = 1,
-        .pDepthStencilAttachment = (VkAttachmentReference[]) {
-            {
-                .attachment = 1,    // depth buffer
-                .layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-            },
+        .pDepthStencilAttachment = &(VkAttachmentReference) {
+            .attachment = 1,    // depth buffer
+            .layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
         },
     };
 
@@ -122,7 +114,6 @@ static create_default_renderpass(VkRenderPass *pass)
 Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
 {
     Pipeline ret = {0};
-    VkResult rc;
     
     create_default_renderpass(&ret.pass);
 
@@ -247,4 +238,14 @@ Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
     }, NULL, &ret.vk);
 
     return ret;
+}
+
+void destroy_pipeline(Pipeline pipe)
+{
+    vkDestroyDescriptorSetLayout(ldev, pipe.set, NULL);
+    vkDestroyPipelineLayout(ldev, pipe.layout, NULL);
+    vkDestroyPipeline(ldev, pipe.vk, NULL);
+    vkDestroyRenderPass(ldev, pipe.pass, NULL);
+    vkDestroyShaderModule(ldev, pipe.vert_shader, NULL);
+    vkDestroyShaderModule(ldev, pipe.frag_shader, NULL);
 }

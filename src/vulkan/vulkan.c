@@ -177,7 +177,6 @@ void create_app(SDL_Window *window)
     };
     
     vkCreateCommandPool(ldev, &command_pool_info, NULL, &cmdpool);
-
     vkCreateDescriptorPool(ldev, &(VkDescriptorPoolCreateInfo){
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = 4,
@@ -244,25 +243,6 @@ Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h)
     image_set_layout(&ret, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     return ret;
-}
-
-void present_init(PresentContext *ctx, VkRenderPass pass);
-void present_terminate(PresentContext *ctx);
-void present_acquire(PresentContext *ctx);
-void present_submit(PresentContext *ctx);
-void present_end_pass(PresentContext *ctx);
-VkCommandBuffer present_begin_pass(PresentContext *ctx);
-
-
-
-void destroy_pipeline(Pipeline pipe)
-{
-    vkDestroyDescriptorSetLayout(ldev, pipe.set, NULL);
-    vkDestroyPipelineLayout(ldev, pipe.layout, NULL);
-    vkDestroyPipeline(ldev, pipe.vk, NULL);
-    vkDestroyRenderPass(ldev, pipe.pass, NULL);
-    vkDestroyShaderModule(ldev, pipe.vert_shader, NULL);
-    vkDestroyShaderModule(ldev, pipe.frag_shader, NULL);
 }
 
 void present_init(PresentContext *ctx, VkRenderPass pass)

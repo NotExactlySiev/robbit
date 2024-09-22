@@ -8,6 +8,7 @@
 #include "../exact/archive.h"
 #include "mesh.h"
 
+// put this in common.h for ALL modules (not just core)
 static inline void die(const char *msg)
 {
     printf("FATAL: %s\n", msg);
@@ -140,7 +141,7 @@ typedef struct {
 } RobbitLevel;
 
 // aloha.c
-int aloha_parse_dat(DatFile *out, EarNode *node);
+void aloha_parse_dat(DatFile *out, EarNode *node);
 
 // mesh.c
 void convert_objset(RobbitObjSet *set, AlohaObjSet *src);

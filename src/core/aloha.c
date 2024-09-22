@@ -159,7 +159,7 @@ void aloha_parse_level(AlohaLevel *out, EarNode *objs_node, EarNode *stage_node)
     aloha_parse_stage(&out->stage, stage_node);
 }
 
-int aloha_parse_dat(DatFile *out, EarNode *node)
+void aloha_parse_dat(DatFile *out, EarNode *node)
 {
     out->node = node;
     if (node->type != EAR_NODE_TYPE_DIR)

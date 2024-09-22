@@ -1,6 +1,7 @@
 #include <types.h>
 #include <stdio.h>
 #include <SDL.h>
+#include <SDL_vulkan.h>
 
 #include "core/common.h"
 #include "core/mesh.h"
@@ -18,18 +19,7 @@ const char* content_strings[] = {
     CONTENTS
 };
 
-static void print_content(EarNode *n)
-{
-    if (n->type == EAR_NODE_TYPE_SEPARATOR) return;
-    //char *str = content_strings[aloha(n)->content];
-    char *str;
-    if (str)
-        printf("\t[%s]", str);
-}
-
 SDL_Window *window;
-//RobbitMesh meshes_normal[128];
-//RobbitMesh meshes_lod[128];
 
 // this should take in an aloha texture
 Image to_vulkan_image(void *data, u16 *clut)
@@ -77,15 +67,14 @@ int main(int argc, char **argv)
     size_t filesize = ftell(fd);
     u8 *buffer = malloc(filesize);
     fseek(fd, 0, SEEK_SET);
-    fread(buffer, 1, filesize, fd);
+    if (fread(buffer, 1, filesize, fd) != filesize) {
+        die("file read failed");
+    }
     fclose(fd);
 
     Ear *ear = ear_decode(buffer, 0);
     DatFile parsed = {0};
-    if (aloha_parse_dat(&parsed, ear->nodes) != 0) {
-        printf("parse failed\n");
-        exit(EXIT_FAILURE);
-    }
+    aloha_parse_dat(&parsed, ear->nodes);
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
     SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_VULKAN;
@@ -141,7 +130,7 @@ int main(int argc, char **argv)
         .descriptorPool = descpool,
         .descriptorSetCount = 4,
         .pSetLayouts = (VkDescriptorSetLayout[]) { pipe.set, pipe.set, pipe.set, pipe.set },
-    }, &desc_sets);
+    }, desc_sets);
 
     Buffer uniform_buffers[max_frames];
     Uniform *uniforms[max_frames];
@@ -149,7 +138,7 @@ int main(int argc, char **argv)
     // and bind them to the resources. fuck this shit
     for (int i = 0; i < max_frames; i++) {
         uniform_buffers[i] = create_buffer(sizeof(Uniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        vkMapMemory(ldev, uniform_buffers[i].mem, 0, sizeof(Uniform), 0, &uniforms[i]);
+        vkMapMemory(ldev, uniform_buffers[i].mem, 0, sizeof(Uniform), 0, (void**) &uniforms[i]);
         VkWriteDescriptorSet writes[2] = {
             {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -158,7 +147,7 @@ int main(int argc, char **argv)
                 .dstArrayElement = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .descriptorCount = 1,
-                .pBufferInfo = &(VkDescriptorBufferInfo[]) {
+                .pBufferInfo = (VkDescriptorBufferInfo[]) {
                     {
                         .buffer = uniform_buffers[i].vk,
                         .offset = 0,
@@ -191,7 +180,6 @@ int main(int argc, char **argv)
 
     bool running = true;
     float t = 0.0;
-    int current_frame = 0;
     float zoom = 3.f;
 
     while (running) {

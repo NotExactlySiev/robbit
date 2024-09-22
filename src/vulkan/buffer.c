@@ -1,5 +1,5 @@
 #include <vulkan/vulkan.h>
-#include "app.h"
+#include "vulkan.h"
 
 // creates buffer and its memory
 Buffer create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags flags)

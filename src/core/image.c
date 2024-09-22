@@ -1,6 +1,6 @@
 #include <string.h>
 #include <stdio.h>
-#include "common.h"
+#include "robbit.h"
 #include "image.h"
 
 // all the different formats
@@ -53,8 +53,9 @@ Image* image_make_from_data(uint8_t* data, uint16_t* clut)
 {
     uint16_t w, h;
     data += 4;
-    READ_BE16(w, data);
-    READ_BE16(h, data);
+    w = u16be(data);
+    h = u16be(data + 2);
+    data += 4;
 
     return image_make(data, w, h, clut);
 }

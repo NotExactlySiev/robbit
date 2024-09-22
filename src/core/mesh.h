@@ -1,8 +1,7 @@
 #ifndef _MESH_H
 #define _MESH_H
 
-#include <types.h>
-#include "../vulkan/app.h"
+#include "../vulkan/vulkan.h"
 
 // These are the data structs as found in the file
 typedef struct {

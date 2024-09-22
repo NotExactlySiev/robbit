@@ -1,5 +1,5 @@
 #include "../exact/archive.h"
-#include "common.h"
+#include "robbit.h"
 
 // Layer 2, node content types and relations
 // these are still immutable and are calculated only once
@@ -96,8 +96,11 @@ EarContent guess_content_base(EarNode *node)
     uint8_t* q;
     uint16_t w,h;
     q = buf + 4;
-    READ_BE16(w, q);
-    READ_BE16(h, q);
+    //READ_BE16(w, q);
+    //READ_BE16(h, q);
+    w = u16be(q);
+    w = u16be(q + 2);
+    q += 4;
     if (w*h + 8 == node->size) return EAR_CONTENT_TEXTURE;
     // the clut for the texture will be found by the parent
 

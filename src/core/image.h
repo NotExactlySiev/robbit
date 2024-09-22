@@ -1,7 +1,7 @@
 #ifndef _IMAGE_H
 #define _IMAGE_H
 
-#include "common.h"
+#include "robbit.h"
 
 typedef struct Color Color;
 typedef struct Image Image;

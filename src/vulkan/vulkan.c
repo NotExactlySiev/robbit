@@ -15,8 +15,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "../core/common.h"
-#include "app.h"
+//#include "../core/common.h"
+#include "vulkan.h"
 
 VkInstance inst;
 VkPhysicalDevice pdev;

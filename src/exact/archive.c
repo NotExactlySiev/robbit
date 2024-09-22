@@ -1,3 +1,4 @@
+#include "../common.h"
 #include "archive.h"
 #include "press.h"
 
@@ -24,18 +25,7 @@ static void *decompress_data(void* compressed_data, uint32_t* size_out)
 }
 
 // does this section have a consistent header structure for a directory?
-//
-
-static u32 u32be(void *_p)
-{
-    u8 *p = _p;
-    return (p[0] << 24)
-         | (p[1] << 16)
-         | (p[2] << 8)
-         | (p[3] << 0);
-}
-
-
+// TODO: rename and make it return a bool
 static EarNodeType find_type(void *data)
 {
     // we already know it's a real node (not separator) so simply

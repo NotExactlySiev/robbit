@@ -1,6 +1,5 @@
-#include "app.h"
-#include "../core/mesh.h"
-#include "../core/common.h"
+#include "../common.h"
+#include "vulkan.h"
 #include <stdio.h>
 
 static VkAttachmentDescription default_color_attachment_desc = {
@@ -63,9 +62,7 @@ static VkShaderModule create_shader_module(const char *file)
     fseek(fd, 0, SEEK_SET);
     // TODO: reading it like this might cause an issue
     u32 *buf = malloc(fsize);
-    if (fsize != fread(buf, 1, fsize, fd)) {
-        die("shader file read failed");
-    }
+    assert(fsize == fread(buf, 1, fsize, fd));
 
     VkShaderModule shader;
     vkCreateShaderModule(ldev, &(VkShaderModuleCreateInfo) {

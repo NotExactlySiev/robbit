@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include "common.h"
+#include "robbit.h"
 
 // section0 is tiled but has a header (it's 0x34 bytes in SOU bonus level)
 // section1 is tiled
@@ -68,9 +68,7 @@ static void geom_unpack(void *data, GeomObj *out)
 void convert_geom(RobbitGeom *dst, AlohaGeom *src)
 {
     int nobjs = geom_count(src->node->buf);
-    if (nobjs > STAGE_MAX_GEOM) {
-        die("too many stage geometry objects");
-    }
+    assert (nobjs <= STAGE_MAX_GEOM);
     dst->n = nobjs;
     printf("%d objects\n", nobjs);
     geom_unpack(src->node->buf, dst->objs);

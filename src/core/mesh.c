@@ -8,7 +8,7 @@
 #include <math.h>
 #include <types.h>
 
-#include "common.h"
+#include "robbit.h"
 #include "mesh.h"
 
 // there is a raw binary of the vo2 file

@@ -128,6 +128,7 @@ Swapchain create_swapchain(Surface surface)
 
 void create_app(SDL_Window *window)
 {
+    VkResult rc;
     uint nexts;
     SDL_Vulkan_GetInstanceExtensions(window, &nexts, NULL);
     const char *exts[nexts];
@@ -149,13 +150,8 @@ void create_app(SDL_Window *window)
         }
     };
     
-    VkResult rc = vkCreateInstance(&createinfo, NULL, &inst);
-    if (VK_SUCCESS != rc)
-        printf("can't instance uwu %d\n", rc);
-
-    rc = SDL_Vulkan_CreateSurface(window, inst, &surface.vk);
-    if (VK_SUCCESS != rc)
-        printf("can't surface uwu %d\n", rc);
+    vkCreateInstance(&createinfo, NULL, &inst);
+    SDL_Vulkan_CreateSurface(window, inst, &surface.vk);
 
     uint32_t queue_family_idx;
     ldev = create_vulkan_device(inst, surface.vk, &pdev, &queue_family_idx);
@@ -270,7 +266,6 @@ void present_init(PresentContext *ctx, VkRenderPass pass)
         vkCreateFramebuffer(ldev, &framebuffer_info, NULL, &ctx->framebuffers[i]);
     }
 
-    //VkCommandBuffer command_bufs[swapchain.nimages];
     VkCommandBufferAllocateInfo command_buf_alloc_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = cmdpool,

@@ -132,7 +132,13 @@ int main(int argc, char **argv)
     Buffer uniform_buffers[max_frames];
     Uniform *uniforms[max_frames];
 
-    // and bind them to the resources. fuck this shit
+    // TODO: we should be able to just tell the vulkan module what type of
+    // uniform we want and just be given a pointer at present time along
+    // with the command buffer. (current frame present context should be
+    // returned as a seperate struct?)
+    // TODO: before that, FIGURE OUT HOW FRAMES IN FLIGHT WORKS AHHHHHH
+    // what things need to be repeated and how many times? wrap anything we
+    // don't actually need to interact with inside the vulkan module
     for (int i = 0; i < max_frames; i++) {
         uniform_buffers[i] = create_buffer(sizeof(Uniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(ldev, uniform_buffers[i].mem, 0, sizeof(Uniform), 0, (void**) &uniforms[i]);
@@ -195,16 +201,16 @@ int main(int argc, char **argv)
         }
 
         t += 0.02;
-
         uniforms[ctx.image_index]->angle = t;
 
         present_acquire(&ctx);
         VkCommandBuffer cbuf = present_begin_pass(&ctx);
 
-        
+        // TODO: wrappity wrap wrap
         vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.vk);        
         vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[ctx.image_index], 0, NULL);
-        
+        // TODO: why do we need to pass the pipeline into this? I just wanna
+        // push some numbers
         draw_level(cbuf, &pipe, &level);
 
         present_end_pass(&ctx);

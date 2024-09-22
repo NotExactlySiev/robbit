@@ -161,9 +161,8 @@ void aloha_parse_level(AlohaLevel *out, EarNode *objs_node, EarNode *stage_node)
 
 void aloha_parse_dat(DatFile *out, EarNode *node)
 {
+    assert(node->type == EAR_NODE_TYPE_DIR);
     out->node = node;
-    assert(node->type != EAR_NODE_TYPE_DIR);
-
     aloha_parse_texture(&out->env[0], &node->sub[0], &node->sub[1]);
     aloha_parse_texture(&out->env[1], &node->sub[2], &node->sub[3]);
 

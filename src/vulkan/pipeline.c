@@ -208,7 +208,7 @@ Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
         .pPushConstantRanges = (VkPushConstantRange[]) {
             {
                 .offset = 0,
-                .size = 3 * sizeof(float),
+                .size = sizeof(PushConst),
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
             }
         }

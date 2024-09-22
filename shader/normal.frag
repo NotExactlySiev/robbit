@@ -1,6 +1,7 @@
 #version 450
 
-layout(binding = 1) uniform sampler2D texSampler;
+layout(set = 0, binding = 1) uniform sampler texSampler;
+layout(set = 0, binding = 2) uniform texture2D textures[32];
 
 layout(location = 0) in flat vec3 fragColor;
 layout(location = 1) in flat uint isTextured;
@@ -9,9 +10,20 @@ layout(location = 3) in vec2 texCoord;
 
 layout(location = 0) out vec4 outColor;
 
+vec3 colors[8] = {
+    vec3(1.0, 0.0, 0.0),
+    vec3(0.0, 1.0, 0.0),
+    vec3(0.0, 0.0, 1.0),
+    vec3(1.0, 1.0, 0.0),
+    vec3(1.0, 0.0, 1.0),
+    vec3(0.0, 1.0, 1.0),
+    vec3(0.5, 0.5, 0.5),
+    vec3(1.0, 1.0, 1.0),
+};
+
 void main() {
     if (isTextured == 1) {
-        outColor = texture(texSampler, texCoord);
+        outColor = texture(sampler2D(textures[textureID], texSampler), texCoord);
         if (outColor.rgb == vec3(0.0, 0.0, 0.0)) {
             discard;
         }

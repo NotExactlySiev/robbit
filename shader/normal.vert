@@ -46,8 +46,7 @@ void main()
     gl_Position.x *= ar;
     gl_Position.z *= 0.05;
     gl_Position.z += 0.4;
-    //fragTexCoord = gl_Position.xy;
-    fragTexCoord = texCoord;
+    fragTexCoord = texCoord*256.0;
     //fragColor = dot(rot*normal, vec3(0., 0., 1.)) * vertColor.rgb;
     fragColor = vertColor.rgb;
 

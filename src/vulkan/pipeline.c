@@ -180,7 +180,7 @@ Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
     // TODO: shouldn't be hardcoded
     vkCreateDescriptorSetLayout(ldev, &(VkDescriptorSetLayoutCreateInfo) {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 2,
+        .bindingCount = 3,
         .pBindings = (VkDescriptorSetLayoutBinding[]) {
             {
                 .binding = 0,
@@ -190,8 +190,14 @@ Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
             },
             {
                 .binding = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
                 .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            },
+            {
+                .binding = 2,
+                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                .descriptorCount = 32,
                 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
             },
         },

@@ -96,7 +96,8 @@ int main(int argc, char **argv)
         { offsetof(RobbitVertex, col),      VK_FORMAT_R8G8B8_UNORM },
         { offsetof(RobbitVertex, normal),   VK_FORMAT_R16G16B16_UNORM },
         { offsetof(RobbitVertex, tex),      VK_FORMAT_R8G8_UINT },
-        { offsetof(RobbitVertex, u),        VK_FORMAT_R8G8_UNORM },
+        { offsetof(RobbitVertex, u),        VK_FORMAT_R16G16_UNORM },
+        //{ offsetof(RobbitVertex, u),        VK_FORMAT_R8G8 },
     };
     int nattrs = sizeof(vert_attrs)/sizeof(*vert_attrs);
     Pipeline pipe = create_pipeline(sizeof(RobbitVertex), vert_attrs, nattrs);
@@ -105,9 +106,9 @@ int main(int argc, char **argv)
         .n = 0,
     };
     //texture.images[0] = 
-    Image teximage = to_vulkan_image(&parsed.levels->objs.tex[0]);
+    /*Image teximage = to_vulkan_image(&parsed.levels->objs.tex[0]);
     image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);
+    VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);*/
 
     //Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
     //texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -128,13 +129,16 @@ int main(int argc, char **argv)
         //float x, y, z;
     } Uniform;
 
+    VkResult rc;
     VkDescriptorSet desc_sets[max_frames];
-    vkAllocateDescriptorSets(ldev, &(VkDescriptorSetAllocateInfo){
+    rc = vkAllocateDescriptorSets(ldev, &(VkDescriptorSetAllocateInfo){
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = descpool,
         .descriptorSetCount = 4,
         .pSetLayouts = (VkDescriptorSetLayout[]) { pipe.set, pipe.set, pipe.set, pipe.set },
     }, desc_sets);
+    printf("rc is %d\n", rc);
+    assert(rc == VK_SUCCESS);
 
     Buffer uniform_buffers[max_frames];
     Uniform *uniforms[max_frames];
@@ -149,7 +153,10 @@ int main(int argc, char **argv)
     for (int i = 0; i < max_frames; i++) {
         uniform_buffers[i] = create_buffer(sizeof(Uniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(ldev, uniform_buffers[i].mem, 0, sizeof(Uniform), 0, (void**) &uniforms[i]);
-        VkWriteDescriptorSet writes[2] = {
+
+        RobbitTexture *textures = &level.objs.texture;
+
+        VkWriteDescriptorSet writes[3] = {
             {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = desc_sets[i],
@@ -170,19 +177,44 @@ int main(int argc, char **argv)
                 .dstSet = desc_sets[i],
                 .dstBinding = 1,
                 .dstArrayElement = 0,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
                 .descriptorCount = 1,
                 .pImageInfo = &(VkDescriptorImageInfo[]) {
+                    {
+                        .sampler = sampler,
+                    },
+                },
+            },
+            {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = desc_sets[i],
+                .dstBinding = 2,
+                .dstArrayElement = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                .descriptorCount = textures->n,
+                /*.pImageInfo = &(VkDescriptorImageInfo[]) {
                     {
                         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         .imageView = texview,
                         .sampler = sampler,
                     },
-                },
+                },*/
             },
         };
 
-        vkUpdateDescriptorSets(ldev, 2, writes, 0, NULL);
+        VkDescriptorImageInfo image_infos[textures->n];
+        writes[2].pImageInfo = image_infos;
+        
+        for (int i = 0; i < textures->n; i++) {
+            printf("view is %X\n", textures->views[i]);
+            image_infos[i] = (VkDescriptorImageInfo) {
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .imageView = textures->views[i],
+                .sampler = VK_NULL_HANDLE,
+            };
+        }
+
+        vkUpdateDescriptorSets(ldev, 3, writes, 0, NULL);
     }
 
     PresentContext ctx = {0};
@@ -226,7 +258,6 @@ int main(int argc, char **argv)
     }
 
     present_terminate(&ctx);
-    //destroy_image(teximage);
     
     // destroy_swapchain
     for (int i = 0; i < swapchain.nimages; i++) {

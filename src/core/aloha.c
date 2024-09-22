@@ -141,6 +141,8 @@ void aloha_parse_objset(AlohaObjSet *out, EarNode *node)
         }
     }
 
+    // TODO: these should probably store how many they find so we don't
+    // duplicate code
     for (int i = 0; i < 2; i++) {
         aloha_parse_texture(&out->tex[i], tex_clut, p++);
         if (p->type == EAR_NODE_TYPE_SEPARATOR) {

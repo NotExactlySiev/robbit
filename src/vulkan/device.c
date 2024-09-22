@@ -77,7 +77,7 @@ VkDevice create_vulkan_device(VkInstance inst, VkSurfaceKHR surface, VkPhysicalD
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queuec,
-        .enabledExtensionCount = 2,
+        .enabledExtensionCount = 1,
         .ppEnabledExtensionNames = extensions,
         .pEnabledFeatures = &ldev_features,
     };

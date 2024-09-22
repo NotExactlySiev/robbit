@@ -176,15 +176,19 @@ void create_app(SDL_Window *window)
     vkCreateDescriptorPool(ldev, &(VkDescriptorPoolCreateInfo){
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = 4,
-        .poolSizeCount = 2,
+        .poolSizeCount = 3,
         .pPoolSizes = (VkDescriptorPoolSize[]) {
             {
                 .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .descriptorCount = 4,
             },
             {
-                .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .type = VK_DESCRIPTOR_TYPE_SAMPLER,
                 .descriptorCount = 4,
+            },
+            {
+                .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                .descriptorCount = 256,
             },
         },
     }, NULL, &descpool);
@@ -206,7 +210,7 @@ void destroy_app(void)
     vkDestroyInstance(inst, NULL);
 }
 
-Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h)
+Image extract_tile(Image *img, u32 x, u32 y, u32 w, u32 h)
 {
     VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     Image ret = create_image(w, h, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR, flags);
@@ -324,7 +328,7 @@ VkCommandBuffer present_begin_pass(PresentContext *ctx)
         .renderArea.extent = surface.cap.currentExtent,
         .clearValueCount = 2,
         .pClearValues = (VkClearValue[])  {
-            { .color = { .float32 = { 0.2f, 0.9f, 0.2f, 0.0f } } },
+            { .color = { .float32 = { 0.1f, 0.15f, 0.1f, 0.0f } } },
             { .depthStencil = { .depth = 0.0f } },
         },
     }, VK_SUBPASS_CONTENTS_INLINE);

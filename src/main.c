@@ -51,184 +51,16 @@ Image to_vulkan_image(void *data, u16 *clut)
     return ret;
 }
 
-Image *reps[1 << 21] = {0};
-
-void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
+void push_const(VkCommandBuffer cbuf, Pipeline *pipe, PushConst p)
 {
-    VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(cbuf, 0, 1, &mesh->vert_buffer.vk, &offset);
-    vkCmdDraw(cbuf, mesh->vert_count, 1, 0, 0);
-}
-
-
-
-void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
-{
-    u16 *clut_data = src->clut_node->buf;
-    mesh_file_parse(src->mesh_nodes[0]->buf, &set->normal);
-    mesh_file_parse(src->mesh_nodes[1]->buf, &set->lod);
-    for (int i = 0; i < 128; i++) {
-        RobbitMesh *m = &set->lod[i];
-        if (m->empty) continue;
-        int nfaces = mesh_faces(NULL, m);
-        AlohaFace faces[nfaces];
-        printf("%d FACES\n");
-        mesh_faces(faces, m);
-        
-        int nprims = 0;
-        RobbitVertex vkverts[2048][3] = {0};
-
-        for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
-            bool tex = !(f->flags1 & 0x8000);
-            bool lit = !(f->flags0 & 0x0001);
-            
-            vkverts[nprims][0].pos = m->verts[f->v0];
-            vkverts[nprims][1].pos = m->verts[f->v1];
-            vkverts[nprims][2].pos = m->verts[f->v2];
-            
-            if (lit) {
-                vkverts[nprims][0].normal.x = f->nv0;
-                vkverts[nprims][0].normal.y = f->nv1;
-                vkverts[nprims][0].normal.z = f->nv2;
-                printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
-            }
-
-            if (tex) {
-                u32 tw = f->unk;
-
-                int page = (f->flags0 & 0x4) >> 2;
-                printf("PAGE %d ");
-                if (tw != 0xE3000000) {
-                    u32 xmask = (tw >> 0) & 0x1F;
-                    u32 ymask = (tw >> 5) & 0x1F;
-                    u32 x = ((tw >> 10) & 0x1F) << 3;
-                    u32 y = ((tw >> 15) & 0x1F) << 3;
-                    u32 w = ((~(xmask << 3)) + 1) & 0xFF;
-                    u32 h = ((~(ymask << 3)) + 1) & 0xFF;
-                    printf("REP %d\t%d\t%d\t%d\t", x, y, w, h);
-
-                    u32 key = (tw & 0xFFFFF) | (page << 20);
-                    if (reps[key] == NULL) {
-                        printf("NEW!\n");
-                        reps[key] = 1;
-                    }
-                }
-                printf("\n");
-
-                vkverts[nprims][0].u = f->tu0;
-                vkverts[nprims][0].v = f->tv0;
-
-                vkverts[nprims][1].u = f->tu1;
-                vkverts[nprims][1].v = f->tv1;
-
-                vkverts[nprims][2].u = f->tu2;
-                vkverts[nprims][2].v = f->tv2;
-            } else {
-                vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
-            }
-
-
-            nprims++;
-
-            if (f->v3 != 0) {
-                vkverts[nprims][0].pos = m->verts[f->v0];
-                vkverts[nprims][1].pos = m->verts[f->v2];
-                vkverts[nprims][2].pos = m->verts[f->v3];
-
-                
-                if (lit) {
-                    vkverts[nprims][0].normal.x = f->nv0;
-                    vkverts[nprims][0].normal.y = f->nv1;
-                    vkverts[nprims][0].normal.z = f->nv2;
-                    printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
-                }
-
-                if (tex) {
-                    vkverts[nprims][0].u = f->tu0;
-                    vkverts[nprims][0].v = f->tv0;
-
-                    vkverts[nprims][1].u = f->tu2;
-                    vkverts[nprims][1].v = f->tv2;
-
-                    vkverts[nprims][2].u = f->tu3;
-                    vkverts[nprims][2].v = f->tv3;
-                } else {
-                    vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
-                }
-                nprims++;
-            }
-        }
-
-        m->vert_count = 3 * nprims;
-        int vert_size = m->vert_count * sizeof(RobbitVertex);
-        Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        buffer_write(vert_buf, vert_size, vkverts);
-        m->vert_buffer = vert_buf;
-    }
-}
-
-void destroy_objset(RobbitObjSet *set)
-{
-    for (int i = 0; i < 128; i++) {
-        if (set->normal[i].empty) continue;
-        destroy_buffer(set->normal[i].vert_buffer);
-    }
-
-    for (int i = 0; i < 128; i++) {
-        if (set->lod[i].empty) continue;
-        destroy_buffer(set->lod[i].vert_buffer);
-    }
-}
-
-void dump_objset(RobbitObjSet *set)
-{
-    for (int i = 0; i < 128; i++) {
-        printf("%03d:\t", i);
-        if (set->normal[i].empty)
-            printf("---\t");
-        else
-            printf("%d\t", set->normal[i].nverts);
-            
-        if (set->lod[i].empty)
-            printf("---\t");
-        else
-            printf("%d\t", set->lod[i].nverts);
-
-        bool normal = !set->normal[i].empty;
-        bool lod = !set->lod[i].empty;
-
-        if (normal) {
-            if (lod) printf("Exists");
-            else printf("Exists (No LOD)");
-        } else {
-            if (lod) printf("!!! Only LOD");
-        }
-        printf("\n");
-    }
-}
-
-void die(const char *msg)
-{
-    printf("%s\n", msg);
-    exit(EXIT_FAILURE);
-}
-
-void convert_geom(GeomObj *dst, AlohaGeom *src)
-{
-    int nobjs = geom_count(geom_node->buf);
-    if (nobjs > STAGE_MAX_GEOM) {
-        die("too many stage geometry objects");
-    }
-    //printf("%d objects\n", nobjs);
-    //Thing levelobjs[nobjs];
-    geom_unpack(geom_node->buf, levelobjs);
-}
-
-void convert_stage(RobbitStage *dst, AlohaStage *src)
-{
-    convert_geom(dst->geom, src->geom);
-    // TODO: other parts
-    /**/
+    vkCmdPushConstants(
+        cbuf,
+        pipe->layout,
+        VK_SHADER_STAGE_VERTEX_BIT,
+        0, 
+        sizeof(p), 
+        &p
+    );
 }
 
 extern uint32_t max_frames;
@@ -255,30 +87,16 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    AlohaLevel *level = &parsed.levels[0];
-    // TODO: make these structures consistent so a node is always at .node
-    EarNode *objs_node = level->objs.node;
-    EarNode *geom_node = level->stage.geom_node;
-
-    printf("objs node is %d\n",  objs_node - ear->nodes);
-    printf("stage node is %d\n", geom_node - ear->nodes);
-
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
     SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_VULKAN;
     window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
     create_app(window);
 
-    RobbitLevel converted_level = {0};
-    
-    //RobbitObjSet objset;
-
-    convert_objset(&converted_level.objs, &level->objs);
-    dump_objset(&converted_level.objs);
-
-    convert_stage(&converted_level.stage, &level->stage);
+    RobbitLevel level = {0};
+    convert_level(&level, &parsed.levels[0]);
     
 
-    Image teximg = to_vulkan_image(objs_node->sub[5].buf, objs_node->sub[1].buf);
+    //Image teximg = to_vulkan_image(objs_node->sub[5].buf, objs_node->sub[1].buf);
 
     // convert to the format vulkan likes
     // TODO: should the conversion be a two step process? first flatten the mesh
@@ -402,19 +220,7 @@ int main(int argc, char **argv)
         vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.vk);        
         vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[ctx.image_index], 0, NULL);
         
-        for (int i = 0; i < nobjs; i++) {
-            if (converted_level.objs.lod[levelobjs[i].id].empty) continue;
-            struct {
-                float x, y, z;
-            } pos = {
-                .x = ((float) levelobjs[i].x) / INT16_MAX,
-                .y = ((float) levelobjs[i].y) / INT16_MAX,
-                .z = ((float) levelobjs[i].z) / INT16_MAX,
-            };
-            vkCmdPushConstants(cbuf, pipe.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pos), &pos);
-            draw_mesh(cbuf, &converted_level.objs.lod[levelobjs[i].id]);
-        }
-        
+        draw_level(cbuf, &pipe, &level);
 
         present_end_pass(&ctx);
         present_submit(&ctx);
@@ -432,9 +238,7 @@ int main(int argc, char **argv)
         destroy_buffer(uniform_buffers[i]);
     }
 
-
-
-    destroy_objset(&objset);
+    destroy_level(&level);
     destroy_pipeline(pipe);
     destroy_app();
 

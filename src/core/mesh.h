@@ -53,18 +53,10 @@ typedef struct {
     u32 vert_count;
 } RobbitMesh;
 
+// TODO: clean this up
 typedef struct {
     u8 r, g, b;
 } _Color;
-
-static inline _Color color_15_to_24(u16 col)
-{
-    return (_Color) {
-        .r = (0x1f & (col >> 0)) << 3,
-        .g = (0x1f & (col >> 5)) << 3,
-        .b = (0x1f & (col >> 10)) << 3,
-    };
-}
 
 typedef struct {
     u16 x, y, z, pad;

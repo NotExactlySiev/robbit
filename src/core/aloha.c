@@ -80,6 +80,12 @@
 // 1- tag the binary files (not the directories)
 // 2- go over the entire thing and generate our own tree with our types
 
+// first the raw archive tree of EarNodes gets converted to a more organized
+// aloha tree using the parse functions in this module, and then those objects
+// get converted to their robbit counterparts that hold more information needed
+// by the program to render and manipulate them.
+// in other words: this module only LOCATES things, it doesn't convert them.
+
 // guess the content of a NODE_TYPE_FILE
 EarContent guess_content_base(EarNode *node)
 {
@@ -144,7 +150,7 @@ void aloha_parse_objset(AlohaObjSet *out, EarNode *node)
 void aloha_parse_stage(AlohaStage *out, EarNode *node)
 {
     out->node = node;
-    out->geom_node = &node->sub[2];
+    out->geom.node = &node->sub[2];
 }
 
 void aloha_parse_level(AlohaLevel *out, EarNode *objs_node, EarNode *stage_node)

@@ -8,14 +8,10 @@
 #include <math.h>
 #include <types.h>
 
-//#include "image.h"
+#include "common.h"
 #include "mesh.h"
 
-// The interface I want is these functions:
-// - how many meshes are in this file?
-// - draw mesh number i to SDL_Surface (what is that?)
-
-// there is a raw binary, of the vo2 file
+// there is a raw binary of the vo2 file
 // a function takes it in, parses it, and returns an array of
 // RobbitMesh structs. this array is all the meshes in the file,
 // all 128 of them, even the empty ones. the empty ones
@@ -24,12 +20,18 @@
 // sections (verts, section 2, header, face data (should be one?))
 // basically only the things we have to calculate anyway just to
 // enumerate the meshes and find the pointer to the start of each one
-// u32 mesh_count(u8 *raw)  // just return the top number
-// mesh_parse(u8 *raw, RobbitMesh *out)
-// mesh_draw(SDL_Renderer *rend, RobbitMesh *mesh, u16 *clut, [texture])
+
+static inline _Color color_15_to_24(u16 col)
+{
+    return (_Color) {
+        .r = (0x1f & (col >> 0)) << 3,
+        .g = (0x1f & (col >> 5)) << 3,
+        .b = (0x1f & (col >> 10)) << 3,
+    };
+}
 
 // how many meshes are in this file? (always is 128)
-u32 mesh_file_count(const u8 *data)
+static u32 mesh_file_count(const u8 *data)
 {
     return (((u32) data[0])
           | ((u32) data[1] << 8)
@@ -37,7 +39,7 @@ u32 mesh_file_count(const u8 *data)
           | ((u32) data[3] << 24));
 }
 
-u32 mesh_file_parse(const u8 *data, RobbitMesh *out)
+static u32 parse_file(u8 *data, RobbitMesh *out)
 {
     u32 count = mesh_file_count(data);
     u32 count_non_empty = 0;
@@ -103,161 +105,9 @@ static u32 translate_index(u8 index, SubsetRange *ranges)
     return j + ranges[range].base/8;
 }
 
-// temp
-/*
-#include <GL/gl.h>
-
-static GLfloat i16tof(i16 x)
-{
-    return ((float) x) / INT16_MAX;
-}
-
-static void aloha2glvert(AlohaVertex t)
-{
-    glVertex3f(i16tof(t.x), i16tof(t.y), i16tof(t.z));
-}
-
-extern GLuint texid[2];
-
-typedef struct {
-    GLuint tex;
-    float xf, yf;
-} RepTex;
-
-
-GLuint reps[1 << 21] = {0}; // lol
-
-// TODO: the main image should store w and h
-// caller should delete texture (TODO: why not keep it cached?)
-static GLuint repeat_texpage(u32 tw, u16 *pixels, int main_w, int main_h, float *xf, float *yf, int page)
-{
-    
-
-    // find the rectangle
-    int xmask = (tw >> 0) & 0x1F;
-    int ymask = (tw >> 5) & 0x1F;
-    int x = ((tw >> 10) & 0x1F) << 3;
-    int y = ((tw >> 15) & 0x1F) << 3;
-    int w = ((~(xmask << 3)) + 1) & 0xFF;
-    int h = ((~(ymask << 3)) + 1) & 0xFF;
-    pixels += y*main_w + x;
-
-    *xf = (float) main_w / w;
-    *yf = (float) main_h / h;
-
-    u32 key = (tw & 0xFFFFF);
-    key = (key << 1) | page;
-    if (reps[key] != 0) return reps[key];
-    printf("no exist! %08X\n", key);
-
-    GLuint tex;
-    glGenTextures(1, &tex);
-    
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, main_w);
-    
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV, pixels);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    reps[key] = tex;
-    return tex;
-}
-
-// this should just receive images and make the textures by itself
-void mesh_render_opengl(RobbitMesh *mesh, u16 *clut, void **textures)
-{   
-    void *p = mesh->faces;
-    for (uint i = 0; i < mesh->groups_count; i++) {
-        u32 subgroups_count = *(u32*)p + 1;
-        p += 4;
-        for (uint j = 0; j < subgroups_count; j++) {
-            u32 ranges_count = (*(u32*)p)/sizeof(SubsetRange);
-            p += 4;
-            SubsetRange *ranges = p;
-            p += ranges_count * sizeof(SubsetRange);
-            u32 faces_count = (*(u32*)p)/sizeof(AlohaFace);
-            p += 4;
-            AlohaFace *faces = p;
-            for (uint k = 0; k < faces_count; k++) {
-                AlohaFace *face = &faces[k];
-                // probably precompute the translations?
-                int v0 = translate_index(faces[k].v0/3, ranges);
-                int v1 = translate_index(faces[k].v1/3, ranges);
-                int v2 = translate_index(faces[k].v2/3, ranges);
-                Color col = image_15_to_24(clut[faces[k].flags0 >> 2]);
-                bool tex = !(faces[k].flags1 & 0x8000);
-                GLuint rep = 0;
-
-                float fu0;
-                float fv0;
-                float fu1;
-                float fv1;
-                float fu2;
-                float fv2;
-                float fu3;
-                float fv3;
-                if (tex) {
-                    int page = (face->flags0 & 0x4) >> 2; 
-                    glColor3f(1.0f, 1.0f, 1.0f);
-                    fu0 = (float) face->tu0 / UINT8_MAX;
-                    fv0 = (float) face->tv0 / UINT8_MAX;
-                    fu1 = (float) face->tu1 / UINT8_MAX;
-                    fv1 = (float) face->tv1 / UINT8_MAX;
-                    fu2 = (float) face->tu2 / UINT8_MAX;
-                    fv2 = (float) face->tv2 / UINT8_MAX;
-                    fu3 = (float) face->tu3 / UINT8_MAX;
-                    fv3 = (float) face->tv3 / UINT8_MAX;
-
-                    u32 tw = face->unk;
-                    if (tw == 0xE2000000) {
-                        glBindTexture(GL_TEXTURE_2D, texid[page]);
-                    } else {
-                        float xf, yf;
-                        rep = repeat_texpage(tw, textures[page], 256, 256, &xf, &yf, page);
-                        fu0 *= xf; fu1 *= xf; fu2 *= xf; fu3 *= xf;
-                        fv0 *= yf; fv1 *= yf; fv2 *= yf; fv3 *= yf;
-                        glBindTexture(GL_TEXTURE_2D, rep);
-                    }
-                } else {
-                    glColor4ub(col.r, col.g, col.b, 0);
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                }
-                glBegin(GL_TRIANGLE_STRIP);
-                    if (tex) glTexCoord2f(fu1, fv1);
-                    aloha2glvert(mesh->verts[v1]);
-                    
-                    if (tex) glTexCoord2f(fu2, fv2);
-                    aloha2glvert(mesh->verts[v2]);
-
-                    if (tex) glTexCoord2f(fu0, fv0);
-                    aloha2glvert(mesh->verts[v0]);
-                    if (faces[k].v3 >= 3) {
-                        int v3 = translate_index(faces[k].v3/3, ranges);
-                        //if (tex) glTexCoord2f((float) face->tu3 / UINT8_MAX, (float) face->tv3 / UINT8_MAX);
-                        if (tex) glTexCoord2f(fu3, fv3);
-                        aloha2glvert(mesh->verts[v3]);
-                    }
-                glEnd();
-            }
-            p += faces_count * sizeof(AlohaFace);
-        }
-    }
-}
-*/
-
-/*
-void mesh_render_vulkan(RobbitMesh *mesh, u16 *clut, void **textures)
-{   
-}
-*/
-
-// this method ONLY extracts an array of faces and translate indices
-// only returns count if out == NULL
-int mesh_faces(AlohaFace *dst, RobbitMesh *mesh)
+// this method ONLY extracts an array of faces and translates indices
+// if out == NULL, just the count is returned
+static int extract_faces(AlohaFace *dst, RobbitMesh *mesh)
 {
     int ret = 0;
     void *p = mesh->faces;
@@ -293,4 +143,158 @@ int mesh_faces(AlohaFace *dst, RobbitMesh *mesh)
         }
     }
     return ret;
+}
+
+void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
+{
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cbuf, 0, 1, &mesh->vert_buffer.vk, &offset);
+    vkCmdDraw(cbuf, mesh->vert_count, 1, 0, 0);
+}
+
+// TODO: right now this only converts the LOD
+void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
+{
+    u8 reps[1 << 21] = {0};
+    u8 ntex = 2;
+    u16 *clut_data = src->clut_node->buf;
+    parse_file(src->mesh_nodes[0]->buf, set->normal);
+    parse_file(src->mesh_nodes[1]->buf, set->lod);
+    
+    for (int i = 0; i < 128; i++) {
+        RobbitMesh *m = &set->lod[i];
+        if (m->empty) continue;
+        int nfaces = extract_faces(NULL, m);
+        AlohaFace faces[nfaces];
+        extract_faces(faces, m);
+        
+        int nprims = 0;
+        RobbitVertex vkverts[2048][3] = {0};
+
+        for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
+            bool tex = !(f->flags1 & 0x8000);
+            bool lit = !(f->flags0 & 0x0001);
+            
+            vkverts[nprims][0].pos = m->verts[f->v0];
+            vkverts[nprims][1].pos = m->verts[f->v1];
+            vkverts[nprims][2].pos = m->verts[f->v2];
+            
+            if (lit) {
+                vkverts[nprims][0].normal.x = f->nv0;
+                vkverts[nprims][0].normal.y = f->nv1;
+                vkverts[nprims][0].normal.z = f->nv2;
+                printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
+            }
+
+            if (tex) {
+                u32 tw = f->unk;
+                int page = (f->flags0 & 0x4) >> 2;
+                if (tw != 0xE3000000) {
+                    u32 xmask = (tw >> 0) & 0x1F;
+                    u32 ymask = (tw >> 5) & 0x1F;
+                    u32 x = ((tw >> 10) & 0x1F) << 3;
+                    u32 y = ((tw >> 15) & 0x1F) << 3;
+                    u32 w = ((~(xmask << 3)) + 1) & 0xFF;
+                    u32 h = ((~(ymask << 3)) + 1) & 0xFF;
+                    
+
+                    u32 key = (tw & 0xFFFFF) | (page << 20);
+                    if (reps[key] == 0) {
+                        printf("PAGE %d ", page);
+                        printf("REP %d\t%d\t%d\t%d\n", x, y, w, h);
+                        reps[key] = ntex++;
+                        // TODO: create the texture here, and cache it
+                    }
+                }
+
+                vkverts[nprims][0].u = f->tu0;
+                vkverts[nprims][0].v = f->tv0;
+
+                vkverts[nprims][1].u = f->tu1;
+                vkverts[nprims][1].v = f->tv1;
+
+                vkverts[nprims][2].u = f->tu2;
+                vkverts[nprims][2].v = f->tv2;
+            } else {
+                vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
+            }
+
+
+            nprims++;
+
+            if (f->v3 != 0) {
+                vkverts[nprims][0].pos = m->verts[f->v0];
+                vkverts[nprims][1].pos = m->verts[f->v2];
+                vkverts[nprims][2].pos = m->verts[f->v3];
+
+                
+                if (lit) {
+                    vkverts[nprims][0].normal.x = f->nv0;
+                    vkverts[nprims][0].normal.y = f->nv1;
+                    vkverts[nprims][0].normal.z = f->nv2;
+                    printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
+                }
+
+                if (tex) {
+                    vkverts[nprims][0].u = f->tu0;
+                    vkverts[nprims][0].v = f->tv0;
+
+                    vkverts[nprims][1].u = f->tu2;
+                    vkverts[nprims][1].v = f->tv2;
+
+                    vkverts[nprims][2].u = f->tu3;
+                    vkverts[nprims][2].v = f->tv3;
+                } else {
+                    vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
+                }
+                nprims++;
+            }
+        }
+
+        m->vert_count = 3 * nprims;
+        int vert_size = m->vert_count * sizeof(RobbitVertex);
+        Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        buffer_write(vert_buf, vert_size, vkverts);
+        m->vert_buffer = vert_buf;
+    }
+}
+
+void destroy_objset(RobbitObjSet *set)
+{
+    for (int i = 0; i < 128; i++) {
+        if (set->normal[i].empty) continue;
+        destroy_buffer(set->normal[i].vert_buffer);
+    }
+
+    for (int i = 0; i < 128; i++) {
+        if (set->lod[i].empty) continue;
+        destroy_buffer(set->lod[i].vert_buffer);
+    }
+}
+
+void dump_objset(RobbitObjSet *set)
+{
+    for (int i = 0; i < 128; i++) {
+        printf("%03d:\t", i);
+        if (set->normal[i].empty)
+            printf("---\t");
+        else
+            printf("%d\t", set->normal[i].nverts);
+            
+        if (set->lod[i].empty)
+            printf("---\t");
+        else
+            printf("%d\t", set->lod[i].nverts);
+
+        bool normal = !set->normal[i].empty;
+        bool lod = !set->lod[i].empty;
+
+        if (normal) {
+            if (lod) printf("Exists");
+            else printf("Exists (No LOD)");
+        } else {
+            if (lod) printf("!!! Only LOD");
+        }
+        printf("\n");
+    }
 }

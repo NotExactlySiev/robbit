@@ -1,11 +1,18 @@
 #ifndef _COMMON_H
 #define _COMMON_H
+// TODO: rename to robbit.h
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include "../exact/archive.h"
 #include "mesh.h"
+
+static inline void die(const char *msg)
+{
+    printf("FATAL: %s\n", msg);
+    exit(EXIT_FAILURE);
+}
 
 #define ENE_MAX_OBJS    16
 
@@ -50,6 +57,12 @@ typedef struct {
 */
 
 typedef struct {
+    float x, y, z;
+} PushConst;
+
+void push_const(VkCommandBuffer cbuf, Pipeline *pipe, PushConst p);
+
+typedef struct {
     // doesn't have a node of its own, abstract object
     EarNode *clut_node;
     EarNode *bitmap_node;
@@ -60,7 +73,7 @@ typedef struct {
     EarNode *clut_node;
     EarNode *mesh_nodes[2];
     AlohaTexture tex[2];    // clut ref is duplicated, who cares
-} AlohaObjSet;
+} AlohaObjSet;  // TODO: MeshSet is better, object is when it's in a stage
 
 typedef struct {
     EarNode *node;
@@ -68,7 +81,7 @@ typedef struct {
 
 typedef struct {
     EarNode *node;
-    AlohaGeom *geom;
+    AlohaGeom geom;
 } AlohaStage;
 
 typedef struct {
@@ -104,7 +117,12 @@ typedef struct {
 #define STAGE_MAX_GEOM  1024
 
 typedef struct {
-    GeomObj geom[STAGE_MAX_GEOM];
+    int n;
+    GeomObj objs[STAGE_MAX_GEOM];
+} RobbitGeom;
+
+typedef struct {
+    RobbitGeom geom;
     // RobbitEntity[]
     // RobbitCollisions[]
     // decorations
@@ -121,5 +139,19 @@ typedef struct {
     RobbitStage stage;
 } RobbitLevel;
 
+// aloha.c
+int aloha_parse_dat(DatFile *out, EarNode *node);
+
+// mesh.c
+void convert_objset(RobbitObjSet *set, AlohaObjSet *src);
+void destroy_objset(RobbitObjSet *set);
+void dump_objset(RobbitObjSet *set);
+void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh);
+
+// level.c
+void convert_level(RobbitLevel *dst, AlohaLevel *src);
+void destroy_level(RobbitLevel *level);
+void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level);
+int find_first_offset(void *data, int offset_size);
 
 #endif

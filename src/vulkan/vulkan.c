@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 #include <SDL.h>
+#include <SDL_vulkan.h>
 
 #include <string.h>
 
@@ -27,12 +28,6 @@ VkCommandPool cmdpool;
 VkDescriptorPool descpool;
 
 uint32_t max_frames = 4;
-
-void die(const char *msg)
-{
-    printf("FATAL: %s\n", msg);
-    exit(EXIT_FAILURE);
-}
 
 VkDevice create_vulkan_device(VkInstance inst, VkSurfaceKHR surface, VkPhysicalDevice *pdev, uint32_t *queue_family_idx);
 
@@ -133,9 +128,9 @@ Swapchain create_swapchain(Surface surface)
 
 void create_app(SDL_Window *window)
 {
-    int nexts;
+    uint nexts;
     SDL_Vulkan_GetInstanceExtensions(window, &nexts, NULL);
-    char *exts[nexts];
+    const char *exts[nexts];
     SDL_Vulkan_GetInstanceExtensions(window, &nexts, exts);
 
     for (int i = 0; i < nexts; i++)
@@ -158,7 +153,7 @@ void create_app(SDL_Window *window)
     if (VK_SUCCESS != rc)
         printf("can't instance uwu %d\n", rc);
 
-    rc = SDL_Vulkan_CreateSurface(window, inst, &surface);
+    rc = SDL_Vulkan_CreateSurface(window, inst, &surface.vk);
     if (VK_SUCCESS != rc)
         printf("can't surface uwu %d\n", rc);
 
@@ -170,9 +165,6 @@ void create_app(SDL_Window *window)
     vkGetDeviceQueue(ldev, queue_family_idx, 0, &queue);
 
     // check swapchain capabilities
-    uint32_t formats_count;
-    uint32_t pmodes_count;
-
     rc = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pdev, surface.vk, &surface.cap);
     VK_CHECK_ERR("can't get surface cap :(");
 
@@ -357,8 +349,8 @@ VkCommandBuffer present_begin_pass(PresentContext *ctx)
         .renderArea.extent = surface.cap.currentExtent,
         .clearValueCount = 2,
         .pClearValues = (VkClearValue[])  {
-            {   .color = {0.0f, 0.0f, 0.0f, 0.0f} },
-            {   .depthStencil = { .depth = 0.0f } },
+            { .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } } },
+            { .depthStencil = { .depth = 0.0f } },
         },
     }, VK_SUBPASS_CONTENTS_INLINE);
     return ctx->current_cmdbuf;

@@ -3,6 +3,7 @@
 
 #include "common.h"
 
+/*
 typedef struct {
     short unk0, unk1;
     short x_a, x_b;
@@ -28,12 +29,6 @@ typedef struct {
     Tiled section2;
     Section3* section3;
 } Level;
-
-Level* level_make(EarNode* node);
-int find_first_offset(void* data, int offset_size);
-Tiled* read_tiled_data(Tiled*, void* data, int offset_size);
-//Tiled* read_tiled_data16(void* data);
-Tiled* read_tiled_data16(void *data, void (*draw_cb)(int));
-//Image* tiled_to_image(Tiled* tiled);
+*/
 
 #endif

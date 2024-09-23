@@ -58,6 +58,7 @@ typedef struct {
     VkCommandBuffer cmdbufs[4];
     VkCommandBuffer current_cmdbuf;
     Image zimage;
+    VkImageView zview;
     int current_frame;
     uint32_t image_index;
 } PresentContext;

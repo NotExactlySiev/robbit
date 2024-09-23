@@ -14,21 +14,21 @@ static VkAttachmentDescription default_color_attachment_desc = {
 };
 
 static VkAttachmentDescription default_depth_attachment_desc = {
-    .format = VK_FORMAT_D32_SFLOAT,
+    .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
     .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
     .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
     .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-    .finalLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 };
 
 VkPipelineRasterizationStateCreateInfo default_raster_info = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
     .polygonMode = VK_POLYGON_MODE_FILL,
     .cullMode = VK_CULL_MODE_BACK_BIT,
-    .frontFace = VK_FRONT_FACE_CLOCKWISE,
+    .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
     .lineWidth = 1.0,
 };
 
@@ -88,7 +88,7 @@ static void create_default_renderpass(VkRenderPass *pass)
         },
         .pDepthStencilAttachment = &(VkAttachmentReference) {
             .attachment = 1,    // depth buffer
-            .layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         },
     };
 

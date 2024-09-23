@@ -251,9 +251,9 @@ void present_init(PresentContext *ctx, VkRenderPass pass)
     ctx->zimage = create_image(
         surface.cap.currentExtent.width,
         surface.cap.currentExtent.height,
-        VK_FORMAT_D32_SFLOAT,
+        VK_FORMAT_D32_SFLOAT_S8_UINT,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    VkImageView zview = image_create_view(ctx->zimage, VK_IMAGE_ASPECT_DEPTH_BIT);
+    VkImageView zview = image_create_view(ctx->zimage, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     for (size_t i = 0; i < swapchain.nimages; i++) {
         VkFramebufferCreateInfo framebuffer_info = {
             .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -269,6 +269,7 @@ void present_init(PresentContext *ctx, VkRenderPass pass)
         };
         vkCreateFramebuffer(ldev, &framebuffer_info, NULL, &ctx->framebuffers[i]);
     }
+    ctx->zview = zview;
 
     VkCommandBufferAllocateInfo command_buf_alloc_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -304,6 +305,7 @@ void present_terminate(PresentContext *ctx)
         vkDestroySemaphore(ldev, ctx->semps_rend_fin[i], NULL);
         vkDestroyFence(ldev, ctx->queue_fences[i], NULL);
     }
+    vkDestroyImageView(ldev, ctx->zview, NULL);
     destroy_image(ctx->zimage);
 }
 

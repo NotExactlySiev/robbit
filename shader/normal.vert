@@ -26,14 +26,14 @@ void main()
     isTextured = texData[0];
     textureID = texData[1];
 
-    float a = 0.1*angle;
+    float a = 0.1 * angle;
     mat3 rot = mat3(
         cos(a), 0., -sin(a),
         0., 1., 0.,
         sin(a), 0., cos(a)
     );
 
-    float b = radians(-25.);
+    float b = radians(-21.);
     mat3 rot2 = mat3(
         1., 0., 0.,
         0., cos(b), sin(b),
@@ -42,9 +42,9 @@ void main()
 
     float ar = 720.0 / 1280.0;
     gl_Position = vec4(rot2*rot*(position+trans), 1.0);
-    gl_Position.xy *= zoom;
-    gl_Position.x *= ar;
-    gl_Position.z *= 0.05;
+    gl_Position.xy *= zoom * zoom;
+    gl_Position.x *= -ar;
+    gl_Position.z *= 0.15;
     gl_Position.z += 0.4;
     fragTexCoord = texCoord*256.0;
     //fragColor = dot(rot*normal, vec3(0., 0., 1.)) * vertColor.rgb;

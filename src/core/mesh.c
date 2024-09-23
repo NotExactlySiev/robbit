@@ -156,6 +156,11 @@ void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
 Image to_vulkan_image(AlohaTexture *src);
 Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h);
 
+static void set_face(RobbitVertex dst[3], AlohaFace *src)
+{
+
+}
+
 // TODO: right now this only converts the LOD
 // TODO: this is fucking horrible lol. so much repeat
 void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
@@ -198,33 +203,28 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
         RobbitVertex vkverts[2048][3] = {0};
 
         for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
+            AlohaVertex v0 = m->verts[f->v0];
+            AlohaVertex v1 = m->verts[f->v1];
+            AlohaVertex v2 = m->verts[f->v2];
+            AlohaVertex v3 = m->verts[f->v3];
+            // TODO: take out these magic flags
             bool tex = !(f->flags1 & 0x8000);
             bool lit = !(f->flags0 & 0x0001);
+            u8 texid;
+            // 16 bits so we don't overflow
+            u16 tu0 = f->tu0, tv0 = f->tv0;
+            u16 tu1 = f->tu1, tv1 = f->tv1;
+            u16 tu2 = f->tu2, tv2 = f->tv2;
+            u16 tu3 = f->tu3, tv3 = f->tv3;
             
-            vkverts[nprims][0].pos = m->verts[f->v0];
-            vkverts[nprims][1].pos = m->verts[f->v1];
-            vkverts[nprims][2].pos = m->verts[f->v2];
-            
-            if (lit) {
-                vkverts[nprims][0].normal.x = f->nv0;
-                vkverts[nprims][0].normal.y = f->nv1;
-                vkverts[nprims][0].normal.z = f->nv2;
-                printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
-            }
+            _Color color = color_15_to_24(clut_data[f->flags0 >> 2]);
 
-            vkverts[nprims][0].tex = tex;
             if (tex) {
-                vkverts[nprims][0].u = f->tu0;
-                vkverts[nprims][0].v = f->tv0;
-
-                vkverts[nprims][1].u = f->tu1;
-                vkverts[nprims][1].v = f->tv1;
-
-                vkverts[nprims][2].u = f->tu2;
-                vkverts[nprims][2].v = f->tv2;
-
-                u32 tw = f->unk;
+                u32 tw = f->texpage;
                 int page = (f->flags0 & 0x4) >> 2;
+
+                texid = page;
+                // TODO: this test is not adequate, false positives
                 if (tw != 0xE3000000) {
                     u32 xmask = (tw >> 0) & 0x1F;
                     u32 ymask = (tw >> 5) & 0x1F;
@@ -232,76 +232,7 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                     u32 y = ((tw >> 15) & 0x1F) << 3;
                     u32 w = ((~(xmask << 3)) + 1) & 0xFF;
                     u32 h = ((~(ymask << 3)) + 1) & 0xFF;
-                    if (w == 0 || h == 0) goto norep1;
-
-                    u32 key = (tw & 0xFFFFF) | (page << 20);
-                    if (reps[key] == 0) {
-                        printf("PAGE %d ", page);
-                        printf("REP %d\t%d\t%d\t%d\n", x, y, w, h);
-
-                        Image subimg = extract_tile(&set->texture.images[page], x, y, w, h);
-                        VkImageView view = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
-                        set->texture.images[ntex] = subimg;
-                        set->texture.views[ntex] = view;
-
-                        reps[key] = ntex++;
-                        // TODO: create the texture here, and cache it
-                    }
-
-                    vkverts[nprims][0].texid = reps[key];
-                    u32 xf = set->texture.images[page].w / w;
-                    u32 yf = set->texture.images[page].h / h;
-                    vkverts[nprims][0].u *= xf;
-                    vkverts[nprims][0].v *= yf;
-                    vkverts[nprims][1].u *= xf;
-                    vkverts[nprims][1].v *= yf;
-                    vkverts[nprims][2].u *= xf;
-                    vkverts[nprims][2].v *= yf;
-                } else {
-norep1:
-                    vkverts[nprims][0].texid = page;
-                }
-            } else {
-                vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
-            }
-
-
-            nprims++;
-
-            if (f->v3 != 0) {
-                vkverts[nprims][0].pos = m->verts[f->v0];
-                vkverts[nprims][1].pos = m->verts[f->v2];
-                vkverts[nprims][2].pos = m->verts[f->v3];
-
-                
-                if (lit) {
-                    vkverts[nprims][0].normal.x = f->nv0;
-                    vkverts[nprims][0].normal.y = f->nv1;
-                    vkverts[nprims][0].normal.z = f->nv2;
-                    printf("%d %d %d %d\n", f->nv0, f->nv1, f->nv2, f->nv3);
-                }
-
-                if (tex) {
-                    vkverts[nprims][0].u = f->tu0;
-                    vkverts[nprims][0].v = f->tv0;
-
-                    vkverts[nprims][1].u = f->tu2;
-                    vkverts[nprims][1].v = f->tv2;
-
-                    vkverts[nprims][2].u = f->tu3;
-                    vkverts[nprims][2].v = f->tv3;
-
-                    u32 tw = f->unk;
-                    int page = (f->flags0 & 0x4) >> 2;
-                    if (tw != 0xE3000000) {
-                        u32 xmask = (tw >> 0) & 0x1F;
-                        u32 ymask = (tw >> 5) & 0x1F;
-                        u32 x = ((tw >> 10) & 0x1F) << 3;
-                        u32 y = ((tw >> 15) & 0x1F) << 3;
-                        u32 w = ((~(xmask << 3)) + 1) & 0xFF;
-                        u32 h = ((~(ymask << 3)) + 1) & 0xFF;
-                        if (w == 0 || h == 0) goto norep2;
-
+                    if (w != 0 && h != 0) {
                         u32 key = (tw & 0xFFFFF) | (page << 20);
                         if (reps[key] == 0) {
                             printf("PAGE %d ", page);
@@ -313,24 +244,52 @@ norep1:
                             set->texture.views[ntex] = view;
 
                             reps[key] = ntex++;
-                            // TODO: create the texture here, and cache it
                         }
-
-                        vkverts[nprims][0].texid = reps[key];
+                        texid = reps[key];
                         u32 xf = set->texture.images[page].w / w;
                         u32 yf = set->texture.images[page].h / h;
-                        vkverts[nprims][0].u *= xf;
-                        vkverts[nprims][0].v *= yf;
-                        vkverts[nprims][1].u *= xf;
-                        vkverts[nprims][1].v *= yf;
-                        vkverts[nprims][2].u *= xf;
-                        vkverts[nprims][2].v *= yf;
-                    } else {
-norep2:
-                        vkverts[nprims][0].texid = page;
+                        tu0 *= xf; tv0 *= yf;
+                        tu1 *= xf; tv1 *= yf;
+                        tu2 *= xf; tv2 *= yf;
+                        tu3 *= xf; tv3 *= yf;
                     }
+                }
+            }
+
+
+            
+            vkverts[nprims][0].pos = v0;
+            vkverts[nprims][1].pos = v1;
+            vkverts[nprims][2].pos = v2;
+            vkverts[nprims][0].tex = tex;
+            if (tex) {
+                vkverts[nprims][0].texid = texid;
+                vkverts[nprims][0].u = tu0;
+                vkverts[nprims][0].v = tv0;
+                vkverts[nprims][1].u = tu1;
+                vkverts[nprims][1].v = tv1;
+                vkverts[nprims][2].u = tu2;
+                vkverts[nprims][2].v = tv2;
+            } else {
+                vkverts[nprims][0].col = color;
+            }
+            nprims++;
+
+            if (f->v3 != 0) {
+                vkverts[nprims][0].pos = v0;
+                vkverts[nprims][1].pos = v2;
+                vkverts[nprims][2].pos = v3;
+                vkverts[nprims][0].tex = tex;
+                if (tex) {
+                    vkverts[nprims][0].texid = texid;
+                    vkverts[nprims][0].u = tu0;
+                    vkverts[nprims][0].v = tv0;
+                    vkverts[nprims][1].u = tu2;
+                    vkverts[nprims][1].v = tv2;
+                    vkverts[nprims][2].u = tu3;
+                    vkverts[nprims][2].v = tv3;
                 } else {
-                    vkverts[nprims][0].col = color_15_to_24(clut_data[f->flags0 >> 2]);
+                    vkverts[nprims][0].col = color;
                 }
                 nprims++;
             }
@@ -356,6 +315,11 @@ void destroy_objset(RobbitObjSet *set)
     for (int i = 0; i < 128; i++) {
         if (set->lod[i].empty) continue;
         destroy_buffer(set->lod[i].vert_buffer);
+    }
+
+    for (int i = 0; i < set->texture.n; i++) {
+        vkDestroyImageView(ldev, set->texture.views[i], NULL);
+        destroy_image(set->texture.images[i]);
     }
 }
 

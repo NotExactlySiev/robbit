@@ -84,7 +84,6 @@ int main(int argc, char **argv)
 
     RobbitLevel level = {0};
     convert_level(&level, &parsed.levels[0]);
-    dump_objset(&level.objs);
 
     // convert to the format vulkan likes
     // TODO: should the conversion be a two step process? first flatten the mesh
@@ -97,7 +96,6 @@ int main(int argc, char **argv)
         { offsetof(RobbitVertex, normal),   VK_FORMAT_R16G16B16_UNORM },
         { offsetof(RobbitVertex, tex),      VK_FORMAT_R8G8_UINT },
         { offsetof(RobbitVertex, u),        VK_FORMAT_R16G16_UNORM },
-        //{ offsetof(RobbitVertex, u),        VK_FORMAT_R8G8 },
     };
     int nattrs = sizeof(vert_attrs)/sizeof(*vert_attrs);
     Pipeline pipe = create_pipeline(sizeof(RobbitVertex), vert_attrs, nattrs);
@@ -126,7 +124,6 @@ int main(int argc, char **argv)
     typedef struct {
         float angle;
         float zoom;
-        //float x, y, z;
     } Uniform;
 
     VkResult rc;
@@ -137,8 +134,6 @@ int main(int argc, char **argv)
         .descriptorSetCount = 4,
         .pSetLayouts = (VkDescriptorSetLayout[]) { pipe.set, pipe.set, pipe.set, pipe.set },
     }, desc_sets);
-    printf("rc is %d\n", rc);
-    assert(rc == VK_SUCCESS);
 
     Buffer uniform_buffers[max_frames];
     Uniform *uniforms[max_frames];
@@ -192,13 +187,6 @@ int main(int argc, char **argv)
                 .dstArrayElement = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
                 .descriptorCount = textures->n,
-                /*.pImageInfo = &(VkDescriptorImageInfo[]) {
-                    {
-                        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        .imageView = texview,
-                        .sampler = sampler,
-                    },
-                },*/
             },
         };
 
@@ -206,7 +194,6 @@ int main(int argc, char **argv)
         writes[2].pImageInfo = image_infos;
         
         for (int i = 0; i < textures->n; i++) {
-            printf("view is %X\n", textures->views[i]);
             image_infos[i] = (VkDescriptorImageInfo) {
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .imageView = textures->views[i],
@@ -221,16 +208,33 @@ int main(int argc, char **argv)
     present_init(&ctx, pipe.pass);
 
     bool running = true;
-    float t = 0.0;
+    float t = 1.0;
     float zoom = 5.f;
+    int mesh_id = 14;
+
+    // TODO: enum this
+    int view_mode = 0;
 
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             //ui_process_event(&event);
             if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE)
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
                     running = 0;
+                } else if (event.key.keysym.sym == SDLK_RIGHT) {
+                    do {
+                        mesh_id = (mesh_id + 1) % 128;
+                    } while (level.objs.normal[mesh_id].empty);
+                    printf("MESH %d\n", mesh_id);
+                } else if (event.key.keysym.sym == SDLK_TAB) {
+                    view_mode = 1 - view_mode;
+                    if (view_mode == 0) {
+                        zoom = 2.5f;
+                    } else {
+                        zoom = 5.0f;
+                    }
+                }
             } else if (event.type == SDL_MOUSEWHEEL) {
                 zoom += 0.18 * event.wheel.preciseY;
                 if (zoom < 0.2) zoom = 0.2;                
@@ -251,13 +255,22 @@ int main(int argc, char **argv)
         vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[ctx.image_index], 0, NULL);
         // TODO: why do we need to pass the pipeline into this? I just wanna
         // push some numbers
-        draw_level(cbuf, &pipe, &level);
+        switch (view_mode) {
+        case 0:
+            draw_level(cbuf, &pipe, &level);
+            break;
+        case 1:
+            push_const(cbuf, &pipe, (PushConst) { 0, 0, 0 });
+            draw_mesh(cbuf, &level.objs.normal[mesh_id]);
+        }
 
         present_end_pass(&ctx);
         present_submit(&ctx);
     }
 
     present_terminate(&ctx);
+
+    vkDestroySampler(ldev, sampler, NULL);
     
     // destroy_swapchain
     for (int i = 0; i < swapchain.nimages; i++) {

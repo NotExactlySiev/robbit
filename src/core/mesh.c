@@ -156,17 +156,34 @@ void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
 Image to_vulkan_image(AlohaTexture *src);
 Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h);
 
-static void set_face(RobbitVertex dst[3], AlohaFace *src)
+static void set_prim(RobbitVertex verts[3], 
+    AlohaVertex v0,
+    AlohaVertex v1,
+    AlohaVertex v2,
+    _Color color,
+    bool tex, u8 texid,
+    u16 tu0, u16 tv0,
+    u16 tu1, u16 tv1,
+    u16 tu2, u16 tv2)
 {
-
+    verts[0].pos = v0;
+    verts[1].pos = v1;
+    verts[2].pos = v2;
+    verts[0].tex = tex;
+    if (tex) {
+        verts[0].texid = texid;
+        verts[0].u = tu0; verts[0].v = tv0;
+        verts[1].u = tu1; verts[1].v = tv1;
+        verts[2].u = tu2; verts[2].v = tv2;
+    } else {
+        verts[0].col = color;
+    }
 }
 
-// TODO: right now this only converts the LOD
-// TODO: this is fucking horrible lol. so much repeat
+// TODO: right now this only converts one of the sets. normal or lod
 void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
 {
     u8 ntex = 0;
-
     // first do the main images (if they exist)
     if (src->tex[0].bitmap_node) {
         Image img = to_vulkan_image(&src->tex[0]);
@@ -216,7 +233,6 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
             u16 tu1 = f->tu1, tv1 = f->tv1;
             u16 tu2 = f->tu2, tv2 = f->tv2;
             u16 tu3 = f->tu3, tv3 = f->tv3;
-            
             _Color color = color_15_to_24(clut_data[f->flags0 >> 2]);
 
             if (tex) {
@@ -256,42 +272,12 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                 }
             }
 
-
-            
-            vkverts[nprims][0].pos = v0;
-            vkverts[nprims][1].pos = v1;
-            vkverts[nprims][2].pos = v2;
-            vkverts[nprims][0].tex = tex;
-            if (tex) {
-                vkverts[nprims][0].texid = texid;
-                vkverts[nprims][0].u = tu0;
-                vkverts[nprims][0].v = tv0;
-                vkverts[nprims][1].u = tu1;
-                vkverts[nprims][1].v = tv1;
-                vkverts[nprims][2].u = tu2;
-                vkverts[nprims][2].v = tv2;
-            } else {
-                vkverts[nprims][0].col = color;
-            }
-            nprims++;
+            set_prim(vkverts[nprims++], v0, v1, v2, color,
+                     tex, texid, tu0, tv0, tu1, tv1, tu2, tv2);
 
             if (f->v3 != 0) {
-                vkverts[nprims][0].pos = v0;
-                vkverts[nprims][1].pos = v2;
-                vkverts[nprims][2].pos = v3;
-                vkverts[nprims][0].tex = tex;
-                if (tex) {
-                    vkverts[nprims][0].texid = texid;
-                    vkverts[nprims][0].u = tu0;
-                    vkverts[nprims][0].v = tv0;
-                    vkverts[nprims][1].u = tu2;
-                    vkverts[nprims][1].v = tv2;
-                    vkverts[nprims][2].u = tu3;
-                    vkverts[nprims][2].v = tv3;
-                } else {
-                    vkverts[nprims][0].col = color;
-                }
-                nprims++;
+                set_prim(vkverts[nprims++], v0, v2, v3, color,
+                     tex, texid, tu0, tv0, tu2, tv2, tu3, tv3);
             }
         }
 

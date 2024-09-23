@@ -226,7 +226,7 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
             AlohaVertex v3 = m->verts[f->v3];
             // TODO: take out these magic flags
             bool tex = !(f->flags1 & 0x8000);
-            bool lit = !(f->flags0 & 0x0001);
+            //bool lit = !(f->flags0 & 0x0001);
             u8 texid;
             // 16 bits so we don't overflow
             u16 tu0 = f->tu0, tv0 = f->tv0;
@@ -236,39 +236,38 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
             _Color color = color_15_to_24(clut_data[f->flags0 >> 2]);
 
             if (tex) {
-                u32 tw = f->texpage;
+                u32 tw = f->texwindow;
                 int page = (f->flags0 & 0x4) >> 2;
 
                 texid = page;
                 // TODO: this test is not adequate, false positives
-                if (tw != 0xE3000000) {
+                if (tw != 0xE2000000) {
                     u32 xmask = (tw >> 0) & 0x1F;
                     u32 ymask = (tw >> 5) & 0x1F;
                     u32 x = ((tw >> 10) & 0x1F) << 3;
                     u32 y = ((tw >> 15) & 0x1F) << 3;
                     u32 w = ((~(xmask << 3)) + 1) & 0xFF;
                     u32 h = ((~(ymask << 3)) + 1) & 0xFF;
-                    if (w != 0 && h != 0) {
-                        u32 key = (tw & 0xFFFFF) | (page << 20);
-                        if (reps[key] == 0) {
-                            printf("PAGE %d ", page);
-                            printf("REP %d\t%d\t%d\t%d\n", x, y, w, h);
+                    assert(w != 0 && h != 0);
 
-                            Image subimg = extract_tile(&set->texture.images[page], x, y, w, h);
-                            VkImageView view = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
-                            set->texture.images[ntex] = subimg;
-                            set->texture.views[ntex] = view;
+                    u32 key = (tw & 0xFFFFF) | (page << 20);
+                    if (reps[key] == 0) {
+                        printf("PAGE %d ", page);
+                        printf("REP %d\t%d\t%d\t%d\n", x, y, w, h);
+                        Image subimg = extract_tile(&set->texture.images[page], x, y, w, h);
+                        VkImageView view = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
+                        set->texture.images[ntex] = subimg;
+                        set->texture.views[ntex] = view;
 
-                            reps[key] = ntex++;
-                        }
-                        texid = reps[key];
-                        u32 xf = set->texture.images[page].w / w;
-                        u32 yf = set->texture.images[page].h / h;
-                        tu0 *= xf; tv0 *= yf;
-                        tu1 *= xf; tv1 *= yf;
-                        tu2 *= xf; tv2 *= yf;
-                        tu3 *= xf; tv3 *= yf;
+                        reps[key] = ntex++;
                     }
+                    texid = reps[key];
+                    u32 xf = set->texture.images[page].w / w;
+                    u32 yf = set->texture.images[page].h / h;
+                    tu0 *= xf; tv0 *= yf;
+                    tu1 *= xf; tv1 *= yf;
+                    tu2 *= xf; tv2 *= yf;
+                    tu3 *= xf; tv3 *= yf;
                 }
             }
 

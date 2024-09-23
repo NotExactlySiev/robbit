@@ -33,7 +33,7 @@ typedef struct {
     u8 tu3, tv3;
 
     // TODO: unknown
-    u32 texpage;
+    u32 texwindow;
 } AlohaFace;
 
 // obscured public struct

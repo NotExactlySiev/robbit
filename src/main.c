@@ -56,8 +56,6 @@ void push_const(VkCommandBuffer cbuf, Pipeline *pipe, PushConst p)
     );
 }
 
-extern uint32_t max_frames;
-
 int main(int argc, char **argv)
 {    
     if (argc != 2) {
@@ -244,15 +242,15 @@ int main(int argc, char **argv)
         }
 
         t += 0.02;
-        uniforms[ctx.image_index]->angle = t;
-        uniforms[ctx.image_index]->zoom = zoom;
+        uniforms[ctx.current_frame]->angle = t;
+        uniforms[ctx.current_frame]->zoom = zoom;
 
         present_acquire(&ctx);
         VkCommandBuffer cbuf = present_begin_pass(&ctx);
 
         // TODO: wrappity wrap wrap
         vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.vk);        
-        vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[ctx.image_index], 0, NULL);
+        vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[ctx.current_frame], 0, NULL);
         // TODO: why do we need to pass the pipeline into this? I just wanna
         // push some numbers
         switch (view_mode) {

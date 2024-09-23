@@ -7,6 +7,7 @@
 #include <SDL.h>
 
 #define     MAX_IMAGES  4
+#define max_frames  2
 
 typedef struct {
     VkSwapchainKHR vk;
@@ -32,6 +33,7 @@ typedef struct {
     VkDeviceMemory mem;
     int w, h;
     VkFormat format;
+    VkImageLayout layout;
 } Image;
 
 // pipeline and what it runs, give to the present loop (change this)
@@ -51,14 +53,14 @@ typedef struct {
 
 typedef struct {
     VkRenderPass pass;
-    VkSemaphore semps_img_avl[4];
-    VkSemaphore semps_rend_fin[4];
-    VkFence queue_fences[4];
-    VkFramebuffer framebuffers[4];
-    VkCommandBuffer cmdbufs[4];
+    VkSemaphore semps_img_avl[max_frames];
+    VkSemaphore semps_rend_fin[max_frames];
+    VkFence queue_fences[max_frames];
+    VkCommandBuffer cmdbufs[max_frames];
     VkCommandBuffer current_cmdbuf;
-    Image zimage;
-    VkImageView zview;
+    Image zimages[MAX_IMAGES];
+    VkImageView zviews[MAX_IMAGES];
+    VkFramebuffer framebuffers[MAX_IMAGES];
     int current_frame;
     uint32_t image_index;
 } PresentContext;
@@ -94,7 +96,7 @@ Buffer create_staging_buffer(void *data, VkDeviceSize size);
 
 Image create_image(uint32_t w, uint32_t h, VkFormat fmt, VkImageUsageFlags use);
 void destroy_image(Image b);
-void image_set_layout(Image *img, VkImageLayout old, VkImageLayout new);
+void image_set_layout(Image *img, VkImageLayout new);
 void image_write(Image *img, void *data);
 VkImageView image_create_view(Image img, VkImageAspectFlags aspect);
 

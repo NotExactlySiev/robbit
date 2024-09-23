@@ -3,7 +3,9 @@
 
 Image create_image(uint32_t w, uint32_t h, VkFormat fmt, VkImageUsageFlags use)
 {
-    Image ret = { .w = w, .h = h, .format = fmt };
+    Image ret = { .w = w, .h = h, .format = fmt,
+        .layout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
     vkCreateImage(ldev, &(VkImageCreateInfo) {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .imageType = VK_IMAGE_TYPE_2D,
@@ -72,9 +74,9 @@ void destroy_image(Image b)
     vkFreeMemory(ldev, b.mem, NULL);
 }
 
-
-void image_set_layout(Image *img, VkImageLayout old, VkImageLayout new)
+void image_set_layout(Image *img, VkImageLayout new)
 {
+    VkImageLayout old = img->layout;
     VkCommandBuffer cb = begin_tmp_cmdbuf();
     VkImageMemoryBarrier barrier = {
         // ASSUME: a lot of assumptions here
@@ -94,6 +96,7 @@ void image_set_layout(Image *img, VkImageLayout old, VkImageLayout new)
     };
     vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 0, 0, 1, &barrier);
     end_tmp_cmdbuf(cb);
+    img->layout = new;
 }
 
 void image_write(Image *img, void *data)
@@ -101,7 +104,7 @@ void image_write(Image *img, void *data)
     VkDeviceSize size = img->w * img->h * 2;   // ASSUME: is 1555
     Buffer stage = create_staging_buffer(data, size);
 
-    image_set_layout(img, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    image_set_layout(img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     // copy to the main vertex buffer
     VkCommandBuffer cb = begin_tmp_cmdbuf();

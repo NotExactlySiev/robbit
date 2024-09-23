@@ -48,5 +48,4 @@ void main()
     gl_Position.z += 0.4;
     fragTexCoord = texCoord*256.0;
     fragColor = vertColor.rgb;
-
 }

@@ -187,7 +187,7 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
     // first do the main images (if they exist)
     if (src->tex[0].bitmap_node) {
         Image img = to_vulkan_image(&src->tex[0]);
-        image_set_layout(&img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        image_set_layout(&img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         VkImageView view = image_create_view(img, VK_IMAGE_ASPECT_COLOR_BIT);
         set->texture.images[ntex] = img;
         set->texture.views[ntex] = view;
@@ -196,7 +196,7 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
 
     if (src->tex[1].bitmap_node) {
         Image img = to_vulkan_image(&src->tex[1]);
-        image_set_layout(&img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        image_set_layout(&img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         VkImageView view = image_create_view(img, VK_IMAGE_ASPECT_COLOR_BIT);
         set->texture.images[ntex] = img;
         set->texture.views[ntex] = view;

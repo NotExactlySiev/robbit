@@ -19,7 +19,7 @@ mkShell {
 
   buildInputs = with pkgs; [
     stb
-    #freetype
+    tracy
     SDL2
   ];
 

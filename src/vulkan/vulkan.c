@@ -27,8 +27,6 @@ Swapchain swapchain;
 VkCommandPool cmdpool;
 VkDescriptorPool descpool;
 
-uint32_t max_frames = 4;
-
 VkDevice create_vulkan_device(VkInstance inst, VkSurfaceKHR surface, VkPhysicalDevice *pdev, uint32_t *queue_family_idx);
 
 #define VK_CHECK_ERR(error)    { if (rc != VK_SUCCESS) printf(error ": %d\n", rc); }
@@ -215,8 +213,8 @@ Image extract_tile(Image *img, u32 x, u32 y, u32 w, u32 h)
     VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     Image ret = create_image(w, h, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR, flags);
 
-    image_set_layout(img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    image_set_layout(&ret, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    image_set_layout(img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    image_set_layout(&ret, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkCommandBuffer cb = begin_tmp_cmdbuf();
     vkCmdCopyImage(cb, 
@@ -240,7 +238,8 @@ Image extract_tile(Image *img, u32 x, u32 y, u32 w, u32 h)
     );
     end_tmp_cmdbuf(cb);
 
-    image_set_layout(&ret, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    image_set_layout(&ret, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    image_set_layout(img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     return ret;
 }
@@ -248,20 +247,20 @@ Image extract_tile(Image *img, u32 x, u32 y, u32 w, u32 h)
 void present_init(PresentContext *ctx, VkRenderPass pass)
 {
     ctx->pass = pass;
-    ctx->zimage = create_image(
-        surface.cap.currentExtent.width,
-        surface.cap.currentExtent.height,
-        VK_FORMAT_D32_SFLOAT_S8_UINT,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    VkImageView zview = image_create_view(ctx->zimage, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     for (size_t i = 0; i < swapchain.nimages; i++) {
+        ctx->zimages[i] = create_image(
+            surface.cap.currentExtent.width,
+            surface.cap.currentExtent.height,
+            VK_FORMAT_D32_SFLOAT_S8_UINT,
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+        ctx->zviews[i] = image_create_view(ctx->zimages[i], VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
         VkFramebufferCreateInfo framebuffer_info = {
             .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             .renderPass = pass,
             .attachmentCount = 2,
             .pAttachments = (VkImageView[]) {
                 swapchain.views[i],
-                zview,
+                ctx->zviews[i],
             },
             .width = surface.cap.currentExtent.width,
             .height = surface.cap.currentExtent.height,
@@ -269,12 +268,11 @@ void present_init(PresentContext *ctx, VkRenderPass pass)
         };
         vkCreateFramebuffer(ldev, &framebuffer_info, NULL, &ctx->framebuffers[i]);
     }
-    ctx->zview = zview;
 
     VkCommandBufferAllocateInfo command_buf_alloc_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = cmdpool,
-        .commandBufferCount = swapchain.nimages,
+        .commandBufferCount = max_frames,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
     };
 
@@ -305,8 +303,8 @@ void present_terminate(PresentContext *ctx)
         vkDestroySemaphore(ldev, ctx->semps_rend_fin[i], NULL);
         vkDestroyFence(ldev, ctx->queue_fences[i], NULL);
     }
-    vkDestroyImageView(ldev, ctx->zview, NULL);
-    destroy_image(ctx->zimage);
+    //vkDestroyImageView(ldev, ctx->zview, NULL);
+    //destroy_image(ctx->zimage);
 }
 
 void present_acquire(PresentContext *ctx)
@@ -315,7 +313,7 @@ void present_acquire(PresentContext *ctx)
     vkResetFences(ldev, 1, &ctx->queue_fences[ctx->current_frame]);
     vkAcquireNextImageKHR(ldev, swapchain.vk, UINT64_MAX, ctx->semps_img_avl[ctx->current_frame], VK_NULL_HANDLE, &ctx->image_index);
 
-    ctx->current_cmdbuf = ctx->cmdbufs[ctx->image_index];
+    ctx->current_cmdbuf = ctx->cmdbufs[ctx->current_frame];
 	vkBeginCommandBuffer(ctx->current_cmdbuf, &(VkCommandBufferBeginInfo){
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
     });
@@ -345,26 +343,23 @@ void present_end_pass(PresentContext *ctx)
 
 void present_submit(PresentContext *ctx)
 {
-    int current_frame = ctx->current_frame;
     VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	VkSubmitInfo submit_info = {
-	    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+
+    vkQueueSubmit(queue, 1, (VkSubmitInfo[]) {{
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &ctx->semps_img_avl[current_frame],
+        .pWaitSemaphores = &ctx->semps_img_avl[ctx->current_frame],
         .pWaitDstStageMask = &wait_stage,
         .commandBufferCount = 1,
-        //.pCommandBuffers = &cmdbufs[img_index],
-        .pCommandBuffers = &ctx->cmdbufs[ctx->image_index],
+        .pCommandBuffers = &ctx->cmdbufs[ctx->current_frame],
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &ctx->semps_rend_fin[current_frame],
-    };
-
-    vkQueueSubmit(queue, 1, &submit_info, ctx->queue_fences[current_frame]);
+        .pSignalSemaphores = &ctx->semps_rend_fin[ctx->current_frame],
+    }}, ctx->queue_fences[ctx->current_frame]);
 
     VkPresentInfoKHR present_info = {
 	    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &ctx->semps_rend_fin[current_frame],
+        .pWaitSemaphores = &ctx->semps_rend_fin[ctx->current_frame],
         .swapchainCount = 1,
         .pSwapchains = &swapchain.vk,
         .pImageIndices = &ctx->image_index,

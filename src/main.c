@@ -1,4 +1,5 @@
 #include "common.h"
+#include <libgen.h>
 #include <SDL.h>
 #include <SDL_vulkan.h>
 
@@ -78,7 +79,26 @@ int main(int argc, char **argv)
 
     TracyCSetThreadName("my own real thread");
     
-    FILE *fd = fopen(argv[1], "r");
+    char *path = argv[1];
+    char *filename = basename(path);
+    size_t namelen = strlen(filename); 
+    if (namelen != 10 && namelen != 11)
+        die("don't know what to do with this file.");
+
+    FileType filetype;
+    if (strcmp("COM_DAT.EAR", filename)) {
+        filetype = FILE_TYPE_COM_DAT;
+    } else if (strcmp("GRA_DAT.EAR", filename)) {
+        filetype = FILE_TYPE_GRA_DAT;
+    } else if (strcmp("_DAT.EAR", filename + namelen - 8)) {
+        filetype = FILE_TYPE_LVL_DAT;
+    } else if (strcmp("_ENE.EAR", filename + namelen - 8)) {
+        filetype = FILE_TYPE_LVL_ENE;
+    } else {
+        die("don't know what to do with this file.");
+    }
+    //printf("%s\n", filename);
+    FILE *fd = fopen(path, "r");
     fseek(fd, 0, SEEK_END);
     size_t filesize = ftell(fd);
     u8 *buffer = malloc(filesize);
@@ -89,10 +109,20 @@ int main(int argc, char **argv)
     Ear *ear = ear_decode(buffer, 0);
     ear_print(&ear->nodes[0], print_content);
     DatFile parsed = {0};
-    aloha_parse_dat(&parsed, ear->nodes);
+
+    switch (filetype) {
+    case FILE_TYPE_LVL_DAT:
+        aloha_parse_dat(&parsed, ear->nodes);
+        break;
+        
+    default:
+        die("this file is not supported yet.");
+    }
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
-    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_VULKAN;
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE 
+                          | SDL_WINDOW_ALLOW_HIGHDPI
+                          | SDL_WINDOW_VULKAN;
     window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
     create_app(window);
 

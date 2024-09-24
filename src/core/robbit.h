@@ -7,6 +7,8 @@
 
 #define ENE_MAX_OBJS    16
 #define STAGE_MAX_GEOM  4096
+#define STAGE_MAX_ENTS  128
+
 #define OBJSET_MAX_MESH 4
 
 #define CONTENTS                    \
@@ -29,6 +31,14 @@ typedef enum EarContent {
 EarContent guess_content_base(EarNode *node);
 
 extern const char *content_strings[];
+
+typedef enum {
+    FILE_TYPE_COM_DAT,
+    FILE_TYPE_GRA_DAT,
+    FILE_TYPE_LVL_DAT,
+    FILE_TYPE_LVL_ENE,
+    FILE_TYPE_COUNT,
+} FileType;
 
 typedef struct {
     // doesn't have a node of its own, abstract object
@@ -53,7 +63,7 @@ typedef struct {
 
 typedef struct {
     EarNode *node;
-    //
+    EarNode *entities_node;
     AlohaGeomHi geom_hi;
     AlohaGeomLo geom_lo;
     //
@@ -108,10 +118,24 @@ typedef struct {
     LoDetailObj objs[STAGE_MAX_GEOM];
 } RobbitGeomLo;
 
+// this would be a "Spirit" in the game itself
 typedef struct {
+    u8  alive;
+    u8  id;
+    i16 x, y, z;
+    u8  _unk[8];
+} RobbitEntity;
+
+typedef struct {
+    // TODO: the header. what is it?
+    uint n;
+    RobbitEntity ents[STAGE_MAX_ENTS];
+} RobbitEntities;
+
+typedef struct {
+    RobbitEntities ent;
     RobbitGeomHi geom_hi;
     RobbitGeomLo geom_lo;
-    // RobbitEntity[]
     // RobbitCollisions[]
     // the other thing
 } RobbitStage;

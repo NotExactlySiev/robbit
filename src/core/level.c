@@ -121,10 +121,33 @@ void destroy_level(RobbitLevel *level)
     //destroy_stage(level->stage);  // Not needed
 }
 
+
+void convert_entities(RobbitEntities *dst, EarNode *src)
+{
+    // skip the header
+    u8 *p = src->buf;
+    printf("header is %d\n", u16le(p));
+    p += u16le(p) + 4;
+
+    int n = 0;
+    u32 *chunks = (u32*) p;
+    for (int i = 0; i < 32*32; i++) {
+        u32 off = chunks[i];
+        if (off == 0) continue;
+        u16 count = *(u16*)(p + off);
+        RobbitEntity *e = p + off + 2;
+        for (int j = 0; j < count; j++) {
+            dst->ents[n++] = e[j];
+        }
+    }
+    dst->n = n;
+}
+
 void convert_stage(RobbitStage *dst, AlohaStage *src)
 {
     // TODO: other parts
     // section 0
+    convert_entities(&dst->ent, src->entities_node);
     convert_geom_hi(&dst->geom_hi, &src->geom_hi);
     convert_geom_lo(&dst->geom_lo, &src->geom_lo);
     // section 3

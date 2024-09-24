@@ -31,6 +31,13 @@ static inline u32 u32be(void *_p)
          | (p[3] << 0);
 }
 
+static inline u16 u16le(void *_p)
+{
+    u8 *p = _p;
+    return (p[0] << 0)
+         | (p[1] << 8);
+}
+
 static inline u32 u32le(void *_p)
 {
     u8 *p = _p;

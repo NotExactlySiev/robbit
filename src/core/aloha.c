@@ -151,7 +151,7 @@ void aloha_parse_objset(AlohaObjSet *out, EarNode *node)
 void aloha_parse_stage(AlohaStage *out, EarNode *node)
 {
     out->node = node;
-    // 0 is entities
+    out->entities_node = &node->sub[0]; 
     out->geom_hi.node = &node->sub[1];
     out->geom_lo.node = &node->sub[2];
     // 3 is ???

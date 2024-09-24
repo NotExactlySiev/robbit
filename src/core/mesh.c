@@ -1,5 +1,4 @@
 #include <types.h>
-
 #include "robbit.h"
 #include "mesh.h"
 
@@ -13,18 +12,10 @@
 // basically only the things we have to calculate anyway just to
 // enumerate the meshes and find the pointer to the start of each one
 
-// how many meshes are in this file? (always is 128)
-static u32 mesh_file_count(const u8 *data)
-{
-    return (((u32) data[0])
-          | ((u32) data[1] << 8)
-          | ((u32) data[2] << 16)
-          | ((u32) data[3] << 24));
-}
-
 static u32 parse_file(u8 *data, RobbitMesh *out)
 {
-    u32 count = mesh_file_count(data);
+    u32 count = u32le(data);
+    assert(count == 128);
     u32 count_non_empty = 0;
     void *p = data + 4;
     for (uint i = 0; i < count; i++) {
@@ -130,7 +121,6 @@ static int extract_faces(AlohaFace *dst, RobbitMesh *mesh)
 
 void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
 {
-    //if (mesh->vert_buffer.vk == VK_NULL_HANDLE) return;
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cbuf, 0, 1, &mesh->vert_buffer.vk, &offset);
     vkCmdDraw(cbuf, mesh->vert_count, 1, 0, 0);

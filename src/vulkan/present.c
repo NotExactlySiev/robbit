@@ -3,6 +3,7 @@
 // abstract swapchain and ALL behind the framebuffer module...? present doesn't
 // need to directly worry about the images even.
 
+// TODO: why is the framebuffer module here :/
 // FIXME: these globals are yucky
 static Image zimages[MAX_IMAGES];
 static VkImageView colorviews[MAX_IMAGES];

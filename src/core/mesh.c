@@ -1,11 +1,3 @@
-// This module parses the binary data for the game's models and draws
-// it to an SDL_Renderer. There are multiple models per .vo2 file, and
-// the clut, texture, and texture clut are stored in the sibling files
-// which are also needed.
-// The main program is tasked with figuring out which is which. This
-// code simply takes them in as input.
-
-#include <math.h>
 #include <types.h>
 
 #include "robbit.h"
@@ -20,15 +12,6 @@
 // sections (verts, section 2, header, face data (should be one?))
 // basically only the things we have to calculate anyway just to
 // enumerate the meshes and find the pointer to the start of each one
-/*
-static inline _Color color_15_to_24(u16 col)
-{
-    return (_Color) {
-        .r = (0x1f & (col >> 0)) << 3,
-        .g = (0x1f & (col >> 5)) << 3,
-        .b = (0x1f & (col >> 10)) << 3,
-    };
-}*/
 
 // how many meshes are in this file? (always is 128)
 static u32 mesh_file_count(const u8 *data)
@@ -207,7 +190,8 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
     
     u16 *clut_data = src->clut_node->buf;
     parse_file(src->mesh_nodes[0]->buf, set->normal);
-    parse_file(src->mesh_nodes[1]->buf, set->lod);
+    // TODO: load LODs too, if they exist
+    //parse_file(src->mesh_nodes[1]->buf, set->lod);
     
     for (int i = 0; i < 128; i++) {
         RobbitMesh *m = &set->normal[i];

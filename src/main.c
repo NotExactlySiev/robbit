@@ -54,6 +54,12 @@ void push_const(VkCommandBuffer cbuf, Pipeline *pipe, PushConst p)
     );
 }
 
+void print_content(EarNode *node)
+{
+    if (node->type == EAR_NODE_TYPE_FILE)
+        printf("\t%s", content_strings[guess_content_base(node)]);
+}
+
 int main(int argc, char **argv)
 {    
     if (argc != 2) {
@@ -72,6 +78,7 @@ int main(int argc, char **argv)
     fclose(fd);
 
     Ear *ear = ear_decode(buffer, 0);
+    ear_print(&ear->nodes[0], print_content);
     DatFile parsed = {0};
     aloha_parse_dat(&parsed, ear->nodes);
 

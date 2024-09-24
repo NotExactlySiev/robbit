@@ -6,6 +6,7 @@
 #include "mesh.h"
 
 #define ENE_MAX_OBJS    16
+#define STAGE_MAX_GEOM  2048
 
 #define CONTENTS                    \
     O(UNKNOWN, Unk, unk)            \
@@ -25,20 +26,6 @@ typedef enum EarContent {
 } EarContent;
 
 extern const char *content_strings[];
-
-EarContent ear_node_guess_content(EarNode* node);
-
-typedef struct AssetViewer AssetViewer;
-// userdata struct allocated for each EarNode
-
-/*
-typedef struct {
-    EarContent  content;
-    // gui stuff
-    bool show_viewer;
-    AssetViewer *viewer;
-} AlohaMetadata;
-*/
 
 typedef struct {
     // doesn't have a node of its own, abstract object
@@ -94,8 +81,6 @@ typedef struct {
     u16 id;
     i16 x, y, z;
 } GeomObj;
-
-#define STAGE_MAX_GEOM  1024
 
 typedef struct {
     uint n;

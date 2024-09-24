@@ -89,31 +89,26 @@
 // guess the content of a NODE_TYPE_FILE
 EarContent guess_content_base(EarNode *node)
 {
-    void* buf = node->buf;
     if (node->size == 0x200) return EAR_CONTENT_CLUT;
     
     // check if it could be a texture
     uint8_t* q;
     uint16_t w,h;
-    q = buf + 4;
-    //READ_BE16(w, q);
-    //READ_BE16(h, q);
+    q = node->buf + 4;
     w = u16be(q);
     w = u16be(q + 2);
     q += 4;
     if (w*h + 8 == node->size) return EAR_CONTENT_TEXTURE;
-    // the clut for the texture will be found by the parent
 
     // now test if it's tiled
     // TODO: move the test to a function in level.c
     for (int i = 1; i <= 64; i <<= 1) {
-        int firstoff = find_first_offset(buf, i);
+        int firstoff = find_first_offset(node->buf, i);
         // sometimes it's 64x32 (or 32x64? who knows)
         if (firstoff == 64*64*i || firstoff == 64*32*i) 
             return EAR_CONTENT_TILED;
     }
         
-    //printf("offset is %X\n", find_first_offset(buf, 4));
     return EAR_CONTENT_MESH;
 }
 
@@ -171,6 +166,11 @@ void aloha_parse_dat(DatFile *out, EarNode *node)
     aloha_parse_texture(&out->env[0], &node->sub[0], &node->sub[1]);
     aloha_parse_texture(&out->env[1], &node->sub[2], &node->sub[3]);
 
-    // FIXME: harcoded
-    aloha_parse_level(&out->levels[0], &node->sub[4], &node->sub[7]);
+    // TODO: convert both levels
+    EarNode *p = &node->sub[4];
+    EarNode *objsets = p;
+    while ((p++)->type != EAR_NODE_TYPE_SEPARATOR);
+    EarNode *stages = p;
+    aloha_parse_level(&out->levels[0], &objsets[0], &stages[0]);
+    //aloha_parse_level(&out->levels[1], &objsets[1], &stages[1]);
 }

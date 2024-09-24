@@ -195,7 +195,8 @@ int main(int argc, char **argv)
     bool running = true;
     float t = 1.0;
     float zoom = 5.f;
-    int mesh_id = 14;
+    uint mesh_id;
+    for (mesh_id = 0; level.objs.lod[0][mesh_id].empty; mesh_id++);
 
     // TODO: enum this
     int view_mode = 0;
@@ -208,6 +209,11 @@ int main(int argc, char **argv)
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
                     running = 0;
+                } else if (event.key.keysym.sym == SDLK_LEFT) {
+                    do {
+                        mesh_id = (mesh_id - 1) % 128;
+                    } while (level.objs.lod[0][mesh_id].empty);
+                    printf("MESH %d\n", mesh_id);
                 } else if (event.key.keysym.sym == SDLK_RIGHT) {
                     do {
                         mesh_id = (mesh_id + 1) % 128;
@@ -255,8 +261,6 @@ int main(int argc, char **argv)
         uniforms[curr_frame]->ratio = 
             (float) surface.cap.currentExtent.height / surface.cap.currentExtent.width;
 
-        //VkCommandBuffer cbuf = present_begin_pass();
-
         // TODO: wrappity wrap wrap
         vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.vk);        
         vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[curr_frame], 0, NULL);
@@ -271,7 +275,6 @@ int main(int argc, char **argv)
             draw_mesh(cbuf, &level.objs.lod[0][mesh_id]);
         }
 
-        //present_end_pass();
         present_submit();
     }
 

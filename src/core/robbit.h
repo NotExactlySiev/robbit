@@ -74,8 +74,8 @@ typedef struct {
 typedef struct {
     // holds the Image and all the possibly required subiamges
     uint n;
-    Image images[32];
-    VkImageView views[32];
+    Image images[MAX_TEXTURES];
+    VkImageView views[MAX_TEXTURES];
 } RobbitTexture;
 
 typedef struct {

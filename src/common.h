@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define MAX_TEXTURES    64
+
 static inline void die(const char *msg)
 {
     printf("FATAL: %s\n", msg);

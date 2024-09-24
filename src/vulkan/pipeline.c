@@ -207,7 +207,7 @@ Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
             {
                 .binding = 2,
                 .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                .descriptorCount = 32,
+                .descriptorCount = MAX_TEXTURES,
                 .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
             },
         },

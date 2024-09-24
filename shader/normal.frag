@@ -1,7 +1,7 @@
 #version 450
 
 layout(set = 0, binding = 1) uniform sampler texSampler;
-layout(set = 0, binding = 2) uniform texture2D textures[32];
+layout(set = 0, binding = 2) uniform texture2D textures[64];
 
 layout(location = 0) in flat vec3 fragColor;
 layout(location = 1) in flat uint isTextured;

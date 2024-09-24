@@ -20,6 +20,16 @@ const char* content_strings[] = {
 
 SDL_Window *window;
 
+void save_to_file(const char* path, EarNode* node)
+{
+    if (node->type != EAR_NODE_TYPE_FILE) return;
+
+    FILE* fd;
+    fd = fopen(path, "w+");
+    fwrite(node->buf, node->size, 1, fd);
+    fclose(fd);
+}
+
 Image to_vulkan_image(AlohaTexture *src)
 {
     void *bitmap = src->bitmap_node->buf;

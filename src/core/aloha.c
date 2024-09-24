@@ -92,11 +92,9 @@ EarContent guess_content_base(EarNode *node)
     if (node->size == 0x200) return EAR_CONTENT_CLUT;
     
     // check if it could be a texture
-    uint8_t* q;
-    uint16_t w, h;
-    q = node->buf + 4;
-    w = u16be(q);
-    h = u16be(q + 2);
+    u8 *q = node->buf + 4;
+    u16 w = u16be(q);
+    u16 h = u16be(q + 2);
     q += 4;
     if (w*h + 8 == node->size) return EAR_CONTENT_TEXTURE;
 
@@ -108,8 +106,11 @@ EarContent guess_content_base(EarNode *node)
         if (firstoff == 64*64*i || firstoff == 64*32*i) 
             return EAR_CONTENT_TILED;
     }
-        
-    return EAR_CONTENT_MESH;
+
+    if (u32le(node->buf) == 128)
+        return EAR_CONTENT_MESH;
+
+    return EAR_CONTENT_UNKNOWN;
 }
 
 // TODO: add error handling to these
@@ -177,4 +178,6 @@ void aloha_parse_dat(DatFile *out, EarNode *node)
     EarNode *stages = p;
     aloha_parse_level(&out->levels[0], &objsets[0], &stages[0]);
     //aloha_parse_level(&out->levels[1], &objsets[1], &stages[1]);
+    while ((p++)->type != EAR_NODE_TYPE_SEPARATOR);
+    out->demo_node = p;
 }

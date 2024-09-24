@@ -70,7 +70,7 @@ typedef struct {
     EarNode *node;
     AlohaTexture env[2];
     AlohaLevel levels[2];
-    EarNode *unk_node;       // TODO: what is this?
+    EarNode *demo_node;       // TODO: what is this?
 } DatFile;
 
 typedef struct {

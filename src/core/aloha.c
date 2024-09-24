@@ -128,7 +128,7 @@ void aloha_parse_objset(AlohaObjSet *out, EarNode *node)
     bool tex = p->type == EAR_NODE_TYPE_FILE;
     EarNode *tex_clut = tex ? p : NULL;
     p++;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < OBJSET_MAX_MESH; i++) {
         out->mesh_nodes[i] = p++;
         if (p->type == EAR_NODE_TYPE_SEPARATOR) {
             p++;

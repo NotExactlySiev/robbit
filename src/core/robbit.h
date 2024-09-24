@@ -7,6 +7,7 @@
 
 #define ENE_MAX_OBJS    16
 #define STAGE_MAX_GEOM  2048
+#define OBJSET_MAX_MESH 4
 
 #define CONTENTS                    \
     O(UNKNOWN, Unk, unk)            \
@@ -36,7 +37,7 @@ typedef struct {
 typedef struct {
     EarNode *node;
     EarNode *clut_node;
-    EarNode *mesh_nodes[2];
+    EarNode *mesh_nodes[OBJSET_MAX_MESH]; // TODO: there can be more?? see AM2_DAT.EAR
     AlohaTexture tex[2];    // clut ref is duplicated, who cares
 } AlohaObjSet;  // TODO: MeshSet is better, object is when it's in a stage
 

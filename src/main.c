@@ -12,10 +12,6 @@
 // so, upload the images directly into it. if it doesn't, convert and then
 // upload.
 
-void the_rest_normal(Pipeline *pipe, RobbitObjSet *objs);
-Pipeline create_pipeline_points();
-Pipeline create_pipeline_normal();
-
 #define USAGE   "earie <.ear file>\n"
 
 const char* content_strings[] = {
@@ -97,10 +93,6 @@ int main(int argc, char **argv)
     int nattrs = sizeof(vert_attrs)/sizeof(*vert_attrs);
     Pipeline pipe = create_pipeline(sizeof(RobbitVertex), vert_attrs, nattrs);
     
-    RobbitTexture texture = {
-        .n = 0,
-    };
-
     VkSampler sampler;
     vkCreateSampler(ldev, &(VkSamplerCreateInfo){
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -117,9 +109,8 @@ int main(int argc, char **argv)
         float ratio;
     } Uniform;
 
-    VkResult rc;
     VkDescriptorSet desc_sets[FRAMES_IN_FLIGHT];
-    rc = vkAllocateDescriptorSets(ldev, &(VkDescriptorSetAllocateInfo){
+    vkAllocateDescriptorSets(ldev, &(VkDescriptorSetAllocateInfo){
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = descpool,
         .descriptorSetCount = 4,
@@ -162,7 +153,7 @@ int main(int argc, char **argv)
                 .dstArrayElement = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
                 .descriptorCount = 1,
-                .pImageInfo = &(VkDescriptorImageInfo[]) {
+                .pImageInfo = (VkDescriptorImageInfo[]) {
                     {
                         .sampler = sampler,
                     },

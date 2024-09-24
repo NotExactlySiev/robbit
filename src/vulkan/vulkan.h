@@ -7,9 +7,6 @@
 #include <vulkan/vulkan.h>
 #include <tracy/TracyC.h>
 
-
-//#define TRACY_ENABLE
-
 #define MAX_IMAGES  4
 #define FRAMES_IN_FLIGHT  2
 
@@ -54,19 +51,6 @@ typedef struct {
     u32 offset;
     VkFormat format;
 } VertexAttr;
-
-/*
-typedef struct {
-    VkSemaphore semps_img_avl[FRAMES_IN_FLIGHT];
-    VkSemaphore semps_rend_fin[FRAMES_IN_FLIGHT];
-    VkFence queue_fences[FRAMES_IN_FLIGHT];
-    VkCommandBuffer cmdbufs[FRAMES_IN_FLIGHT];
-    
-    VkCommandBuffer current_cmdbuf;
-    int current_frame;
-    uint32_t image_index;
-} PresentContext;
-*/
 
 typedef struct {
     VkSemaphore image_acquired;

@@ -60,7 +60,6 @@ void end_tmp_cmdbuf(VkCommandBuffer buf)
 
 void create_app(SDL_Window *window)
 {
-    VkResult rc;
     uint nexts;
     SDL_Vulkan_GetInstanceExtensions(window, &nexts, NULL);
     const char *exts[nexts];

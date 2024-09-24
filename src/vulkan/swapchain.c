@@ -5,10 +5,7 @@ Swapchain create_swapchain(void)
     VkResult rc;
     Swapchain ret = {0};
 
-    
-    // check swapchain capabilities
-    rc = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pdev, surface.vk, &surface.cap);
-    VK_CHECK_ERR("can't get surface cap :(");
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pdev, surface.vk, &surface.cap);
 
     VkSwapchainCreateInfoKHR swapchainc = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,

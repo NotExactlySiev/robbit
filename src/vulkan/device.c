@@ -21,10 +21,10 @@ VkDevice create_vulkan_device(VkInstance inst, VkSurfaceKHR surface, VkPhysicalD
         VkPhysicalDevice dev = devices[i];
         vkGetPhysicalDeviceProperties(dev, &prop);
         vkGetPhysicalDeviceFeatures(dev, &feat);
-        //vkGetPhysicalDeviceFormatProperties(dev, );
+        
         printf("\t%d\t%s\n", prop.deviceID, prop.deviceName);
         *pdev = devices[i];
-        if (i == 0) break;
+        if (prop.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) break;
     }
 
     uint32_t queue_family_count;

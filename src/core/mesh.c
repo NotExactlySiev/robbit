@@ -232,7 +232,10 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                     u32 y = ((tw >> 15) & 0x1F) << 3;
                     u32 w = ((~(xmask << 3)) + 1) & 0xFF;
                     u32 h = ((~(ymask << 3)) + 1) & 0xFF;
-                    assert(w != 0 && h != 0);
+                    // I'm pretty sure this is correct...
+                    assert(w != 0 || h != 0);
+                    w = w ?: set->texture.images[page].w;
+                    h = h ?: set->texture.images[page].h;
 
                     u32 key = (tw & 0xFFFFF) | (page << 20);
                     if (reps[key] == 0) {

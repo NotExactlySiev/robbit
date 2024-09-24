@@ -92,7 +92,7 @@ int main(int argc, char **argv)
     dump_objset(&level.objs);
 
     VertexAttr vert_attrs[] = {
-        { 0,                                VK_FORMAT_R16G16B16_SNORM },
+        { offsetof(RobbitVertex, pos),      VK_FORMAT_R16G16B16_SNORM },
         { offsetof(RobbitVertex, col),      VK_FORMAT_R8G8B8_UNORM },
         { offsetof(RobbitVertex, normal),   VK_FORMAT_R16G16B16_UNORM },
         { offsetof(RobbitVertex, tex),      VK_FORMAT_R8G8_UINT },

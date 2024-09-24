@@ -45,11 +45,19 @@ typedef struct {
 
 typedef struct {
     EarNode *node;
-} AlohaGeom;
+} AlohaGeomHi;
 
 typedef struct {
     EarNode *node;
-    AlohaGeom geom;
+} AlohaGeomLo;
+
+typedef struct {
+    EarNode *node;
+    //
+    AlohaGeomHi geom_hi;
+    AlohaGeomLo geom_lo;
+    //
+    //
 } AlohaStage;
 
 typedef struct {
@@ -83,18 +91,28 @@ typedef struct {
 typedef struct {
     u16 id;
     i16 x, y, z;
-} GeomObj;
+} HiDetailObj;
+
+typedef struct {
+    i16 x, y, z;
+    u16 id;
+} LoDetailObj;
 
 typedef struct {
     uint n;
-    GeomObj objs[STAGE_MAX_GEOM];
-} RobbitGeom;
+    HiDetailObj objs[STAGE_MAX_GEOM];
+} RobbitGeomHi;
 
 typedef struct {
-    RobbitGeom geom;
+    uint n;
+    LoDetailObj objs[STAGE_MAX_GEOM];
+} RobbitGeomLo;
+
+typedef struct {
+    RobbitGeomHi geom_hi;
+    RobbitGeomLo geom_lo;
     // RobbitEntity[]
     // RobbitCollisions[]
-    // decorations
     // the other thing
 } RobbitStage;
 

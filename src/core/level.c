@@ -29,8 +29,43 @@ int find_first_offset(void *data, int offset_size)
     }
 }
 
+// section 1
+typedef struct {
+    u16 count;
+    LoDetailObj objs[];
+} OtherBlock;
+
+static int geom_hi_count(void *data)
+{
+    // error checking? validation?
+    int ret = 0;
+    u32 *chunks = data;
+    for (int i = 0; i < 32*32; i++) {
+        u32 off = chunks[i];
+        if (off == 0) continue;
+        u16 *p = data + off;
+        ret += *p;
+    }
+    return ret;
+}
+
+static void geom_hi_unpack(void *data, LoDetailObj *out)
+{
+    int n = 0;
+    u32 *chunks = data;
+    for (int i = 0; i < 32*32; i++) {
+        u32 off = chunks[i];
+        if (off == 0) continue;
+        OtherBlock *p = data + off;
+        u16 count = p->count;
+        for (int j = 0; j < count; j++) {
+            out[n++] = p->objs[j];
+        }
+    }
+}
+
 // for section 2 (geom) only. TODO: take out common code with other sections
-static int geom_count(void *data)
+static int geom_lo_count(void *data)
 {
     // error checking? validation?
     int ret = 0;
@@ -44,11 +79,11 @@ static int geom_count(void *data)
     return ret;
 }
 
-static void geom_unpack(void *data, GeomObj *out)
+static void geom_lo_unpack(void *data, HiDetailObj *out)
 {
     typedef struct {
         u16 count;
-        GeomObj objs[];
+        HiDetailObj objs[];
     } ObjBlock;
 
     int n = 0;
@@ -64,13 +99,20 @@ static void geom_unpack(void *data, GeomObj *out)
     }
 }
 
-void convert_geom(RobbitGeom *dst, AlohaGeom *src)
+void convert_geom_hi(RobbitGeomLo *dst, AlohaGeomHi *src)
 {
-    int nobjs = geom_count(src->node->buf);
-    assert (nobjs <= STAGE_MAX_GEOM);
+    int nobjs = geom_hi_count(src->node->buf);
+    assert(nobjs <= STAGE_MAX_GEOM);
     dst->n = nobjs;
-    printf("%d objects\n", nobjs);
-    geom_unpack(src->node->buf, dst->objs);
+    geom_hi_unpack(src->node->buf, dst->objs);
+}
+
+void convert_geom_lo(RobbitGeomHi *dst, AlohaGeomLo *src)
+{
+    int nobjs = geom_lo_count(src->node->buf);
+    assert(nobjs <= STAGE_MAX_GEOM);
+    dst->n = nobjs;
+    geom_lo_unpack(src->node->buf, dst->objs);
 }
 
 void destroy_level(RobbitLevel *level)
@@ -81,8 +123,12 @@ void destroy_level(RobbitLevel *level)
 
 void convert_stage(RobbitStage *dst, AlohaStage *src)
 {
-    convert_geom(&dst->geom, &src->geom);
     // TODO: other parts
+    // section 0
+    convert_geom_hi(&dst->geom_hi, &src->geom_hi);
+    convert_geom_lo(&dst->geom_lo, &src->geom_lo);
+    // section 3
+    // section 4 (?)
 }
 
 void convert_level(RobbitLevel *dst, AlohaLevel *src)
@@ -93,8 +139,8 @@ void convert_level(RobbitLevel *dst, AlohaLevel *src)
 
 void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
 {
-    for (int i = 0; i < level->stage.geom.n; i++) {
-        GeomObj *obj = &level->stage.geom.objs[i];
+    for (int i = 0; i < level->stage.geom_hi.n; i++) {
+        LoDetailObj *obj = &level->stage.geom_hi.objs[i];
         if (level->objs.lod[0][obj->id].empty) continue;
         push_const(cbuf, pipe, (PushConst) {
             .x = ((float) obj->x) / INT16_MAX,

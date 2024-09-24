@@ -37,7 +37,7 @@ typedef struct {
 typedef struct {
     EarNode *node;
     EarNode *clut_node;
-    EarNode *mesh_nodes[OBJSET_MAX_MESH]; // TODO: there can be more?? see AM2_DAT.EAR
+    EarNode *mesh_nodes[OBJSET_MAX_MESH];
     AlohaTexture tex[2];    // clut ref is duplicated, who cares
 } AlohaObjSet;  // TODO: MeshSet is better, object is when it's in a stage
 

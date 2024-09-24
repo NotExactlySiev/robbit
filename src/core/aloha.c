@@ -93,10 +93,10 @@ EarContent guess_content_base(EarNode *node)
     
     // check if it could be a texture
     uint8_t* q;
-    uint16_t w,h;
+    uint16_t w, h;
     q = node->buf + 4;
     w = u16be(q);
-    w = u16be(q + 2);
+    h = u16be(q + 2);
     q += 4;
     if (w*h + 8 == node->size) return EAR_CONTENT_TEXTURE;
 

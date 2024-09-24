@@ -128,7 +128,6 @@ int main(int argc, char **argv)
 
     RobbitLevel level = {0};
     convert_level(&level, &parsed.levels[0]);
-    //dump_objset(&level.objs);
 
     VertexAttr vert_attrs[] = {
         { offsetof(RobbitVertex, pos),      VK_FORMAT_R16G16B16_SNORM },
@@ -139,7 +138,7 @@ int main(int argc, char **argv)
     };
     int nattrs = sizeof(vert_attrs)/sizeof(*vert_attrs);
     Pipeline pipe = create_pipeline(sizeof(RobbitVertex), vert_attrs, nattrs);
-    
+
     VkSampler sampler;
     vkCreateSampler(ldev, &(VkSamplerCreateInfo){
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -232,6 +231,8 @@ int main(int argc, char **argv)
 
     present_init();
 
+    ui_init();
+
     bool running = true;
     float t = 1.0;
     float zoom = 5.f;
@@ -245,6 +246,7 @@ int main(int argc, char **argv)
         TracyCFrameMark
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            ui_process_event(&event);
             switch (event.type) {
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
@@ -315,8 +317,10 @@ int main(int argc, char **argv)
             draw_mesh(cbuf, &level.objs.lod[0][mesh_id]);
         }
 
+        ui_run(ear->nodes, cbuf, pipe.vk);
         present_submit();
     }
+    ui_kill();
 
     present_terminate();
     vkDestroySampler(ldev, sampler, NULL);

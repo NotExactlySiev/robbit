@@ -70,6 +70,7 @@ extern SDL_Window *window;
 extern VkInstance inst;
 extern VkPhysicalDevice pdev;
 extern VkDevice ldev;
+extern u32 queue_family;
 extern VkQueue queue;
 extern Surface surface;
 extern Swapchain swapchain;
@@ -99,7 +100,7 @@ Buffer create_staging_buffer(void *data, VkDeviceSize size);
 
 Image create_image(uint32_t w, uint32_t h, VkFormat fmt, VkImageUsageFlags use);
 void destroy_image(Image b);
-void image_set_layout(Image *img, VkImageLayout new);
+void image_set_layout(Image *img, VkImageLayout layout);
 void image_write(Image *img, void *data);
 VkImageView image_create_view(Image img, VkImageAspectFlags aspect);
 

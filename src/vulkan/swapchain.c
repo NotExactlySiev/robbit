@@ -1,5 +1,7 @@
 #include "vulkan.h"
 
+u32 min_image_count = 0;
+
 Swapchain create_swapchain(void)
 {
     VkResult rc;
@@ -25,6 +27,7 @@ Swapchain create_swapchain(void)
         .clipped = VK_TRUE,
         .oldSwapchain = VK_NULL_HANDLE,
     };
+    min_image_count = surface.cap.minImageCount + 1;
 
     rc = vkCreateSwapchainKHR(ldev, &swapchainc, NULL, &ret.vk);
     VK_CHECK_ERR("Can't create swapchain");

@@ -7,6 +7,7 @@ sources = files([
   'src/vulkan/pipeline.c', 'src/vulkan/swapchain.c', 'src/vulkan/present.c',
   'src/vulkan/framebuffer.c',
   'src/core/level.c', 'src/core/mesh.c', 'src/core/aloha.c',
+  'src/ui/ui.cpp',
 ])
 
 shaders = [
@@ -46,6 +47,7 @@ stb_dep = dependency('stb')
 sdl2_dep = dependency('SDL2')
 vulkan_dep = dependency('vulkan', static: true)
 tracy_dep = dependency('tracy', static: true)
+imgui_dep = dependency('imgui', static: true)
 
 if get_option('tracy_enable') and get_option('buildtype') != 'debugoptimized'
   warning('buildtype not set')
@@ -54,7 +56,7 @@ endif
 executable('robbit', sources, 
   include_directories: inc,
   link_args : '-lm',
-  dependencies: [sdl2_dep, vulkan_dep, stb_dep, shaders_dep, tracy_dep],
+  dependencies: [sdl2_dep, vulkan_dep, stb_dep, shaders_dep, tracy_dep, imgui_dep],
   install: true,
   gui_app: true,
 )

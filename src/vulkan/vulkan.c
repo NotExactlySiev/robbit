@@ -4,6 +4,7 @@
 VkInstance inst;
 VkPhysicalDevice pdev;
 VkDevice ldev;
+u32 queue_family;
 VkQueue queue;
 Surface surface;
 Swapchain swapchain;
@@ -67,19 +68,18 @@ void create_app(SDL_Window *window)
     vkCreateInstance(&createinfo, NULL, &inst);
     SDL_Vulkan_CreateSurface(window, inst, &surface.vk);
 
-    uint32_t queue_family_idx;
-    ldev = create_vulkan_device(inst, surface.vk, &pdev, &queue_family_idx);
+    ldev = create_vulkan_device(inst, surface.vk, &pdev, &queue_family);
     
     // ok we got a window and a vk instance jesus fuck.
     // and get access to the queue
-    vkGetDeviceQueue(ldev, queue_family_idx, 0, &queue);
+    vkGetDeviceQueue(ldev, queue_family, 0, &queue);
 
     swapchain = create_swapchain();
     // command pool and command buffer from the queue
     VkCommandPoolCreateInfo command_pool_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = queue_family_idx,
+        .queueFamilyIndex = queue_family,
     };
     
     vkCreateCommandPool(ldev, &command_pool_info, NULL, &cmdpool);

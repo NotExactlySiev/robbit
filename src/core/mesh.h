@@ -1,6 +1,7 @@
 #ifndef _MESH_H
 #define _MESH_H
 
+#include "../common.h"
 #include "../vulkan/vulkan.h"
 
 // These are the data structs as found in the file
@@ -53,11 +54,6 @@ typedef struct {
     Buffer vert_buffer;
     u32 vert_count;
 } RobbitMesh;
-
-// TODO: clean this up
-typedef struct {
-    u8 r, g, b;
-} _Color;
 
 typedef struct {
     u16 x, y, z, pad;

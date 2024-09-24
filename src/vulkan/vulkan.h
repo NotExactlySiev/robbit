@@ -3,17 +3,23 @@
 
 #include <types.h>
 #include <string.h>
-#include <vulkan/vulkan.h>
 #include <SDL.h>
+#include <vulkan/vulkan.h>
+#include <tracy/TracyC.h>
 
-#define     MAX_IMAGES  4
+
+//#define TRACY_ENABLE
+
+#define MAX_IMAGES  4
 #define max_frames  2
+
+#define VK_CHECK_ERR(error)    { if (rc != VK_SUCCESS) printf(error ": %d\n", rc); }
 
 typedef struct {
     VkSwapchainKHR vk;
     uint32_t nimages;
-    VkImage images[MAX_IMAGES];
-    VkImageView views[MAX_IMAGES];
+    //VkImage images[MAX_IMAGES]; // unwrapped! do we even need to keep it?
+    //VkImageView views[MAX_IMAGES];
 } Swapchain;
 
 typedef struct {
@@ -41,7 +47,6 @@ typedef struct {
     VkPipeline vk;
     VkPipelineLayout layout;
     VkDescriptorSetLayout set;
-    VkRenderPass pass;  // only one for now
     VkShaderModule vert_shader;
     VkShaderModule frag_shader;
 } Pipeline;
@@ -52,30 +57,32 @@ typedef struct {
 } VertexAttr;
 
 typedef struct {
-    VkRenderPass pass;
     VkSemaphore semps_img_avl[max_frames];
     VkSemaphore semps_rend_fin[max_frames];
     VkFence queue_fences[max_frames];
     VkCommandBuffer cmdbufs[max_frames];
+    
     VkCommandBuffer current_cmdbuf;
-    Image zimages[MAX_IMAGES];
-    VkImageView zviews[MAX_IMAGES];
-    VkFramebuffer framebuffers[MAX_IMAGES];
     int current_frame;
     uint32_t image_index;
 } PresentContext;
+
+extern VkFramebuffer framebuffers[MAX_IMAGES];
+void create_framebuffers(Swapchain *sc);
+void destroy_framebuffers(Swapchain *sc);
 
 // globals
 extern SDL_Window *window;
 extern VkInstance inst;
 extern VkPhysicalDevice pdev;
 extern VkDevice ldev;
-extern VkQueue queue;  // ASSUMES: only one    
+extern VkQueue queue;
 extern Surface surface;
 extern Swapchain swapchain;
-extern VkDescriptorPool descpool;
+extern VkRenderPass default_renderpass;
 
 // pools
+extern VkDescriptorPool descpool;
 extern VkCommandPool cmdpool;
 
 void create_app(SDL_Window *window);
@@ -100,7 +107,10 @@ void image_set_layout(Image *img, VkImageLayout new);
 void image_write(Image *img, void *data);
 VkImageView image_create_view(Image img, VkImageAspectFlags aspect);
 
-void present_init(PresentContext *ctx, VkRenderPass pass);
+Swapchain create_swapchain(void);
+void destroy_swapchain(Swapchain sc);
+
+void present_init(PresentContext *ctx);
 void present_terminate(PresentContext *ctx);
 void present_acquire(PresentContext *ctx);
 void present_submit(PresentContext *ctx);

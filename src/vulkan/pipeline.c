@@ -2,6 +2,7 @@
 #include "vulkan.h"
 #include <stdio.h>
 
+// TODO: renderpass stuff should probably be separate.
 static VkAttachmentDescription default_color_attachment_desc = {
     .format = VK_FORMAT_B8G8R8A8_SRGB,
     .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -75,20 +76,26 @@ static VkShaderModule create_shader_module(const char *file)
     return shader;
 }
 
-static void create_default_renderpass(VkRenderPass *pass)
+VkRenderPass default_renderpass;
+
+// basic ass renderpass. one color one depth. one subpass.
+static VkRenderPass create_basic_renderpass(void)
 {
+    VkRenderPass ret;
     VkSubpassDescription subp_descp = {
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .colorAttachmentCount = 1,
         .pColorAttachments = (VkAttachmentReference[]) {
             {
-                .attachment = 0,    // window surface
+                .attachment = 0,
                 .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             },
         },
-        .pDepthStencilAttachment = &(VkAttachmentReference) {
-            .attachment = 1,    // depth buffer
-            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        .pDepthStencilAttachment = (VkAttachmentReference[]) {
+            {
+                .attachment = 1,
+                .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            }
         },
     };
 
@@ -97,22 +104,25 @@ static void create_default_renderpass(VkRenderPass *pass)
     VkRenderPassCreateInfo renderpass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .attachmentCount = 2,
-        .pAttachments = (VkAttachmentDescription[]){ 
+        .pAttachments = (VkAttachmentDescription[]) { 
             default_color_attachment_desc,
             default_depth_attachment_desc,
         },
         .subpassCount = 1,
-        .pSubpasses = &subp_descp,
+        .pSubpasses = (VkSubpassDescription[]) {
+            subp_descp            
+        },
     };
     printf("creating render pass %d\n", renderpass_info.attachmentCount);
-    vkCreateRenderPass(ldev, &renderpass_info, NULL, pass);
+    vkCreateRenderPass(ldev, &renderpass_info, NULL, &ret);
+    return ret;
 }
 
 Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
 {
     Pipeline ret = {0};
     
-    create_default_renderpass(&ret.pass);
+    default_renderpass = create_basic_renderpass();
 
     VkVertexInputAttributeDescription attr_descs[nattrs];
     for (int i = 0; i < nattrs; i++) {
@@ -235,9 +245,17 @@ Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
             .depthCompareOp = VK_COMPARE_OP_GREATER,
         },
         .layout = ret.layout,
-        .renderPass = ret.pass,
+        .renderPass = default_renderpass,
         .basePipelineHandle = VK_NULL_HANDLE,
         .basePipelineIndex = -1,
+        .pDynamicState = &(VkPipelineDynamicStateCreateInfo) {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = 2,
+            .pDynamicStates = (VkDynamicState[]) {
+                VK_DYNAMIC_STATE_VIEWPORT,
+                VK_DYNAMIC_STATE_SCISSOR,
+            },
+        },
     }, NULL, &ret.vk);
 
     return ret;
@@ -248,7 +266,7 @@ void destroy_pipeline(Pipeline pipe)
     vkDestroyDescriptorSetLayout(ldev, pipe.set, NULL);
     vkDestroyPipelineLayout(ldev, pipe.layout, NULL);
     vkDestroyPipeline(ldev, pipe.vk, NULL);
-    vkDestroyRenderPass(ldev, pipe.pass, NULL);
+    vkDestroyRenderPass(ldev, default_renderpass, NULL);
     vkDestroyShaderModule(ldev, pipe.vert_shader, NULL);
     vkDestroyShaderModule(ldev, pipe.frag_shader, NULL);
 }

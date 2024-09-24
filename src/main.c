@@ -8,6 +8,10 @@
 #include "core/level.h"
 #include "vulkan/vulkan.h"
 
+// here's a fun idea: check if the physical device supports 1555 images, and if
+// so, upload the images directly into it. if it doesn't, convert and then
+// upload.
+
 void the_rest_normal(Pipeline *pipe, RobbitObjSet *objs);
 Pipeline create_pipeline_points();
 Pipeline create_pipeline_normal();
@@ -62,6 +66,8 @@ int main(int argc, char **argv)
         printf(USAGE);
         return -1;
     }
+
+    TracyCSetThreadName("my own real thread");
     
     FILE *fd = fopen(argv[1], "r");
     fseek(fd, 0, SEEK_END);
@@ -122,6 +128,7 @@ int main(int argc, char **argv)
     typedef struct {
         float angle;
         float zoom;
+        float ratio;
     } Uniform;
 
     VkResult rc;
@@ -203,7 +210,7 @@ int main(int argc, char **argv)
     }
 
     PresentContext ctx = {0};
-    present_init(&ctx, pipe.pass);
+    present_init(&ctx);
 
     bool running = true;
     float t = 1.0;
@@ -214,10 +221,12 @@ int main(int argc, char **argv)
     int view_mode = 0;
 
     while (running) {
+        TracyCFrameMarkStart("Frame");
+
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            //ui_process_event(&event);
-            if (event.type == SDL_KEYDOWN) {
+            switch (event.type) {
+            case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
                     running = 0;
                 } else if (event.key.keysym.sym == SDLK_RIGHT) {
@@ -233,11 +242,26 @@ int main(int argc, char **argv)
                         zoom = 5.0f;
                     }
                 }
-            } else if (event.type == SDL_MOUSEWHEEL) {
+                break;
+
+            case SDL_WINDOWEVENT:
+                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    //framebuffer_resized = false;
+                }
+                break;
+
+            case SDL_MOUSEWHEEL:
                 zoom += 0.18 * event.wheel.preciseY;
-                if (zoom < 0.2) zoom = 0.2;                
-            } else if (event.type == SDL_QUIT) {
+                if (zoom < 0.2) zoom = 0.2;
+                break;
+
+            case SDL_QUIT:
                 running = 0;
+                break;
+
+            default:
+                //printf("Unhandled Event: %d\n", event.type);
+                break;
             }
         }
 
@@ -246,6 +270,10 @@ int main(int argc, char **argv)
         uniforms[ctx.current_frame]->zoom = zoom;
 
         present_acquire(&ctx);
+        // TODO: current extent should be easier to access
+        uniforms[ctx.current_frame]->ratio = 
+            (float) surface.cap.currentExtent.height / surface.cap.currentExtent.width;
+
         VkCommandBuffer cbuf = present_begin_pass(&ctx);
 
         // TODO: wrappity wrap wrap
@@ -264,16 +292,13 @@ int main(int argc, char **argv)
 
         present_end_pass(&ctx);
         present_submit(&ctx);
+
+        TracyCFrameMarkEnd("Frame");
+        //fflush(stdout);
     }
 
     present_terminate(&ctx);
-
     vkDestroySampler(ldev, sampler, NULL);
-    
-    // destroy_swapchain
-    for (int i = 0; i < swapchain.nimages; i++) {
-        vkDestroyFramebuffer(ldev, ctx.framebuffers[i], NULL);
-    }
 
     for (int i = 0; i < max_frames; i++) {
         destroy_buffer(uniform_buffers[i]);

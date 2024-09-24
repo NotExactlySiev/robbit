@@ -15,6 +15,7 @@ layout(location = 3) out vec2 fragTexCoord;
 layout(set = 0, binding = 0) uniform UB {
     float angle;
     float zoom;
+    float ratio;
 };
 
 layout(push_constant) uniform PC {
@@ -40,10 +41,9 @@ void main()
         0., -sin(b), cos(b)
     );
 
-    float ar = 720.0 / 1280.0;
     gl_Position = vec4(rot2*rot*(position+trans), 1.0);
     gl_Position.xy *= zoom * zoom;
-    gl_Position.x *= -ar;
+    gl_Position.x *= -ratio;
     gl_Position.z *= 0.15;
     gl_Position.z += 0.4;
     fragTexCoord = texCoord*256.0;

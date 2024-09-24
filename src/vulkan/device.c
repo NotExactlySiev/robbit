@@ -1,26 +1,30 @@
 #include <stdio.h>
+#include <types.h>
 #include <vulkan/vulkan.h>
 
 // creates a generic vulkan device
 VkDevice create_vulkan_device(VkInstance inst, VkSurfaceKHR surface, VkPhysicalDevice *pdev, uint32_t *queue_family_idx)
 {
     VkResult rc;
-    uint32_t devcount = 0;
+    
     VkPhysicalDeviceProperties prop;
     VkPhysicalDeviceFeatures feat;
 
     // what physical devices do we have?
-    vkEnumeratePhysicalDevices(inst, &devcount, NULL);
-    VkPhysicalDevice devices[devcount];
-    vkEnumeratePhysicalDevices(inst, &devcount, devices);
+    u32 ndev;
+    vkEnumeratePhysicalDevices(inst, &ndev, NULL);
+    VkPhysicalDevice devices[ndev];
+    vkEnumeratePhysicalDevices(inst, &ndev, devices);
 
     // select one appropriate for us (for now just the first one)
-    for (int i = 0; i < devcount; i++) {
-        vkGetPhysicalDeviceProperties(devices[i], &prop);
-        vkGetPhysicalDeviceFeatures(devices[i], &feat);
+    for (int i = 0; i < ndev; i++) {
+        VkPhysicalDevice dev = devices[i];
+        vkGetPhysicalDeviceProperties(dev, &prop);
+        vkGetPhysicalDeviceFeatures(dev, &feat);
+        //vkGetPhysicalDeviceFormatProperties(dev, );
         printf("\t%d\t%s\n", prop.deviceID, prop.deviceName);
         *pdev = devices[i];
-        break;
+        if (i == 0) break;
     }
 
     uint32_t queue_family_count;
@@ -45,8 +49,9 @@ VkDevice create_vulkan_device(VkInstance inst, VkSurfaceKHR surface, VkPhysicalD
         printf("\n");
 
         // pick a queue that can do graphics
-        if (qflags & VK_QUEUE_GRAPHICS_BIT) 
+        if (qflags & VK_QUEUE_GRAPHICS_BIT) {
             *queue_family_idx = i;
+        }
     }
 
     VkBool32 supported;

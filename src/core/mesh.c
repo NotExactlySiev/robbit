@@ -20,7 +20,7 @@
 // sections (verts, section 2, header, face data (should be one?))
 // basically only the things we have to calculate anyway just to
 // enumerate the meshes and find the pointer to the start of each one
-
+/*
 static inline _Color color_15_to_24(u16 col)
 {
     return (_Color) {
@@ -28,7 +28,7 @@ static inline _Color color_15_to_24(u16 col)
         .g = (0x1f & (col >> 5)) << 3,
         .b = (0x1f & (col >> 10)) << 3,
     };
-}
+}*/
 
 // how many meshes are in this file? (always is 128)
 static u32 mesh_file_count(const u8 *data)
@@ -156,7 +156,7 @@ void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
 Image to_vulkan_image(AlohaTexture *src);
 Image extract_tile(Image *img, i32 x, i32 y, i32 w, i32 h);
 
-static void set_prim(RobbitVertex verts[3], 
+static void set_prim(RobbitVertex *verts, 
     AlohaVertex v0,
     AlohaVertex v1,
     AlohaVertex v2,
@@ -217,7 +217,7 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
         extract_faces(faces, m);
         
         int nprims = 0;
-        RobbitVertex vkverts[2048][3] = {0};
+        RobbitVertex vkverts[2048][3];
 
         for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
             AlohaVertex v0 = m->verts[f->v0];
@@ -279,6 +279,8 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                      tex, texid, tu0, tv0, tu2, tv2, tu3, tv3);
             }
         }
+
+        assert(nprims < 2048);
 
         m->vert_count = 3 * nprims;
         int vert_size = m->vert_count * sizeof(RobbitVertex);

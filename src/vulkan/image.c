@@ -1,4 +1,5 @@
 #include <vulkan/vulkan.h>
+#include "../common.h"
 #include "vulkan.h"
 
 Image create_image(uint32_t w, uint32_t h, VkFormat fmt, VkImageUsageFlags use)
@@ -51,23 +52,6 @@ VkImageView image_create_view(Image img, VkImageAspectFlags aspect)
     return ret;
 }
 
-/*
-VkSampler image_create_sampler(App *app, Image img)
-{
-    VkSampler ret;
-    vkCreateSampler(ldev, &(VkSamplerCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .magFilter = VK_FILTER_NEAREST,
-        .minFilter = VK_FILTER_NEAREST,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-    }, NULL, &ret);
-    return ret;
-}*/
-
-//Image texture_from_file()
-
 void destroy_image(Image b)
 {
     vkDestroyImage(ldev, b.vk, NULL);
@@ -101,7 +85,7 @@ void image_set_layout(Image *img, VkImageLayout new)
 
 void image_write(Image *img, void *data)
 {
-    VkDeviceSize size = img->w * img->h * 2;   // ASSUME: is 1555
+    VkDeviceSize size = img->w * img->h * sizeof(u16);   // ASSUME: is 1555
     Buffer stage = create_staging_buffer(data, size);
 
     image_set_layout(img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);

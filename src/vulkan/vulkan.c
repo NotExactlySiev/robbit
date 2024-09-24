@@ -29,8 +29,6 @@ VkDescriptorPool descpool;
 
 VkDevice create_vulkan_device(VkInstance inst, VkSurfaceKHR surface, VkPhysicalDevice *pdev, uint32_t *queue_family_idx);
 
-#define VK_CHECK_ERR(error)    { if (rc != VK_SUCCESS) printf(error ": %d\n", rc); }
-
 VkCommandBuffer begin_tmp_cmdbuf(void)
 {
     VkCommandBuffer ret;
@@ -58,70 +56,6 @@ void end_tmp_cmdbuf(VkCommandBuffer buf)
     }, NULL);
     vkQueueWaitIdle(queue);
     vkFreeCommandBuffers(ldev, cmdpool, 1, &buf);
-}
-
-Swapchain create_swapchain(Surface surface)
-{
-    VkResult rc;
-    Swapchain ret = {0};
-
-    VkSwapchainCreateInfoKHR swapchainc = {
-        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .flags = 0,
-        .surface = surface.vk,
-        .minImageCount = surface.cap.minImageCount + 1, // what's this for? why?
-        .imageFormat = VK_FORMAT_B8G8R8A8_SRGB,
-        .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
-        .imageExtent = surface.cap.currentExtent,
-        .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        // don't have to specify queue families because not sharing
-        .preTransform = surface.cap.currentTransform, // TODO: try different transforms
-        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = VK_PRESENT_MODE_FIFO_KHR,
-        .clipped = VK_TRUE,
-        .oldSwapchain = VK_NULL_HANDLE,
-    };
-
-    rc = vkCreateSwapchainKHR(ldev, &swapchainc, NULL, &ret.vk);
-    VK_CHECK_ERR("Can't create swapchain");
-
-    vkGetSwapchainImagesKHR(ldev, ret.vk, &ret.nimages, NULL);
-    vkGetSwapchainImagesKHR(ldev, ret.vk, &ret.nimages, ret.images);
-    VK_CHECK_ERR("Can't get images from swapchain");
-
-    printf("Retrieved %d images from the swapchain.\n", ret.nimages);
-
-    // TODO: use image_create_view here
-    // create a view for each so we can give it to the renderpass
-    VkImageViewCreateInfo viewc = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .flags = 0,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = VK_FORMAT_B8G8R8A8_SRGB,
-        .components = { 
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-        },
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        }
-    };
-
-    for (int i = 0; i < ret.nimages; i++) {
-        viewc.image = ret.images[i];
-        rc = vkCreateImageView(ldev, &viewc, NULL, &ret.views[i]);
-        VK_CHECK_ERR("Can't create image view");
-    }
-
-    return ret;
 }
 
 void create_app(SDL_Window *window)
@@ -158,11 +92,7 @@ void create_app(SDL_Window *window)
     // and get access to the queue
     vkGetDeviceQueue(ldev, queue_family_idx, 0, &queue);
 
-    // check swapchain capabilities
-    rc = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pdev, surface.vk, &surface.cap);
-    VK_CHECK_ERR("can't get surface cap :(");
-
-    swapchain = create_swapchain(surface);
+    swapchain = create_swapchain();
     // command pool and command buffer from the queue
     VkCommandPoolCreateInfo command_pool_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -196,13 +126,7 @@ void destroy_app(void)
 {
     vkDestroyCommandPool(ldev, cmdpool, NULL);
     vkDestroyDescriptorPool(ldev, descpool, NULL);
-
-    for (int i = 0; i < swapchain.nimages; i++) {
-        vkDestroyImageView(ldev, swapchain.views[i], NULL);
-    }
-
-    // call destroy_swapchain and destroy_surface
-    vkDestroySwapchainKHR(ldev, swapchain.vk, NULL);
+    destroy_swapchain(swapchain);
     vkDestroySurfaceKHR(inst, surface.vk, NULL);
     vkDestroyDevice(ldev, NULL);
     vkDestroyInstance(inst, NULL);
@@ -239,36 +163,44 @@ Image extract_tile(Image *img, u32 x, u32 y, u32 w, u32 h)
     end_tmp_cmdbuf(cb);
 
     image_set_layout(&ret, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    image_set_layout(img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    image_set_layout(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     return ret;
 }
 
-void present_init(PresentContext *ctx, VkRenderPass pass)
-{
-    ctx->pass = pass;
-    for (size_t i = 0; i < swapchain.nimages; i++) {
-        ctx->zimages[i] = create_image(
-            surface.cap.currentExtent.width,
-            surface.cap.currentExtent.height,
-            VK_FORMAT_D32_SFLOAT_S8_UINT,
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-        ctx->zviews[i] = image_create_view(ctx->zimages[i], VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-        VkFramebufferCreateInfo framebuffer_info = {
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass = pass,
-            .attachmentCount = 2,
-            .pAttachments = (VkImageView[]) {
-                swapchain.views[i],
-                ctx->zviews[i],
-            },
-            .width = surface.cap.currentExtent.width,
-            .height = surface.cap.currentExtent.height,
-            .layers = 1,
-        };
-        vkCreateFramebuffer(ldev, &framebuffer_info, NULL, &ctx->framebuffers[i]);
-    }
+// this is a part of present_
 
+
+// basic binary semaphore
+VkSemaphore create_semaphore(void)
+{
+    VkSemaphore ret;
+    vkCreateSemaphore(ldev, &(VkSemaphoreCreateInfo) {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = &(VkSemaphoreTypeCreateInfo) {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+            .semaphoreType = VK_SEMAPHORE_TYPE_BINARY,
+        },
+    }, NULL, &ret);
+    return ret;
+}
+
+// basic fence. can be initially signaled
+VkFence create_fence(bool signaled)
+{
+    VkFence ret;
+    vkCreateFence(ldev, &(VkFenceCreateInfo) {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .flags = signaled ? VK_FENCE_CREATE_SIGNALED_BIT : 0,
+    }, NULL, &ret);
+    return ret;
+}
+
+void present_init(PresentContext *ctx)
+{
+    ctx->current_frame = 0;
+    
+    create_framebuffers(&swapchain);
     VkCommandBufferAllocateInfo command_buf_alloc_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = cmdpool,
@@ -278,20 +210,10 @@ void present_init(PresentContext *ctx, VkRenderPass pass)
 
     vkAllocateCommandBuffers(ldev, &command_buf_alloc_info, ctx->cmdbufs);
 
-    // make the semaphore
-    VkSemaphoreCreateInfo semp_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-    };
-
-    VkFenceCreateInfo queue_fence_info = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-    };
-
     for (int i = 0; i < max_frames; i++) {
-        vkCreateSemaphore(ldev, &semp_info, NULL, &ctx->semps_img_avl[i]); 
-        vkCreateFence(ldev, &queue_fence_info, NULL, &ctx->queue_fences[i]);
-        vkCreateSemaphore(ldev, &semp_info, NULL, &ctx->semps_rend_fin[i]); 
+        ctx->semps_img_avl[i] = create_semaphore();
+        ctx->semps_rend_fin[i] = create_semaphore();
+        ctx->queue_fences[i] = create_fence(true);
     }
 }
 
@@ -303,19 +225,78 @@ void present_terminate(PresentContext *ctx)
         vkDestroySemaphore(ldev, ctx->semps_rend_fin[i], NULL);
         vkDestroyFence(ldev, ctx->queue_fences[i], NULL);
     }
-    //vkDestroyImageView(ldev, ctx->zview, NULL);
-    //destroy_image(ctx->zimage);
+    destroy_framebuffers(&swapchain);
+}
+
+void destroy_swapchain(Swapchain sc)
+{
+    vkDestroySwapchainKHR(ldev, sc.vk, NULL);
+}
+
+extern SDL_Window *window;
+
+void recreate_swapchain(PresentContext *ctx)
+{
+    vkDeviceWaitIdle(ldev);
+    destroy_framebuffers(&swapchain);
+    destroy_swapchain(swapchain);
+    vkDestroySurfaceKHR(inst, surface.vk, NULL);
+
+    SDL_Vulkan_CreateSurface(window, inst, &surface.vk);    
+    swapchain = create_swapchain();
+    create_framebuffers(&swapchain);
 }
 
 void present_acquire(PresentContext *ctx)
 {
+    VkResult rc;
     vkWaitForFences(ldev, 1 ,&ctx->queue_fences[ctx->current_frame], VK_TRUE, UINT64_MAX);
+
+again:
+    rc = vkAcquireNextImageKHR(ldev, swapchain.vk, UINT64_MAX,
+        ctx->semps_img_avl[ctx->current_frame], VK_NULL_HANDLE,
+        &ctx->image_index);
+    
+    switch (rc) {
+    case VK_SUCCESS:
+        //printf("is correct!\n");
+        break;
+        
+    case VK_ERROR_OUT_OF_DATE_KHR:
+        printf("out of date :(\n");
+//        exit(1);
+  //      break;
+
+    case VK_SUBOPTIMAL_KHR:
+        vkDestroySemaphore(ldev, ctx->semps_img_avl[ctx->current_frame], NULL);
+        ctx->semps_img_avl[ctx->current_frame] = create_semaphore();
+        recreate_swapchain(ctx);
+        goto again;
+        break;
+
+    default:
+        printf("can't acquire. %d\n", rc);
+        assert(0);
+    }
+
     vkResetFences(ldev, 1, &ctx->queue_fences[ctx->current_frame]);
-    vkAcquireNextImageKHR(ldev, swapchain.vk, UINT64_MAX, ctx->semps_img_avl[ctx->current_frame], VK_NULL_HANDLE, &ctx->image_index);
+    //printf("SEM %x will be signaled\n", ctx->semps_img_avl[ctx->current_frame]);
 
     ctx->current_cmdbuf = ctx->cmdbufs[ctx->current_frame];
 	vkBeginCommandBuffer(ctx->current_cmdbuf, &(VkCommandBufferBeginInfo){
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    });
+    vkCmdSetViewport(ctx->current_cmdbuf, 0, 1, &(VkViewport){
+        .x = 0.0,
+        .y = 0.0,
+        .width = surface.cap.currentExtent.width,
+        .height = surface.cap.currentExtent.height,
+        .minDepth = 0.0,
+        .maxDepth = 1.0,
+    });
+    vkCmdSetScissor(ctx->current_cmdbuf, 0, 1, &(VkRect2D) {
+        .offset = { 0, 0 },
+        .extent = surface.cap.currentExtent,
     });
 }
 
@@ -323,8 +304,8 @@ VkCommandBuffer present_begin_pass(PresentContext *ctx)
 {
     vkCmdBeginRenderPass(ctx->current_cmdbuf, &(VkRenderPassBeginInfo) {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = ctx->pass,       // begin THIS renderpass
-        .framebuffer = ctx->framebuffers[ctx->image_index], // with THESE atachments
+        .renderPass = default_renderpass,
+        .framebuffer = framebuffers[ctx->image_index],
         .renderArea.extent = surface.cap.currentExtent,
         .clearValueCount = 2,
         .pClearValues = (VkClearValue[])  {

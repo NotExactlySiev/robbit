@@ -27,6 +27,7 @@ void main()
     isTextured = texData[0];
     textureID = texData[1];
 
+    // TODO: move matrix generation to the application
     float a = 0.1 * angle;
     mat3 rot = mat3(
         cos(a), 0., -sin(a),

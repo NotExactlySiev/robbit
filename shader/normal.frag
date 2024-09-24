@@ -1,6 +1,7 @@
 #version 450
 
 layout(set = 0, binding = 1) uniform sampler texSampler;
+// keep this count in sync with common.h
 layout(set = 0, binding = 2) uniform texture2D textures[64];
 
 layout(location = 0) in flat vec3 fragColor;
@@ -9,17 +10,6 @@ layout(location = 2) in flat uint textureID;
 layout(location = 3) in vec2 texCoord;
 
 layout(location = 0) out vec4 outColor;
-
-vec3 colors[8] = {
-    vec3(1.0, 0.0, 0.0),
-    vec3(0.0, 1.0, 0.0),
-    vec3(0.0, 0.0, 1.0),
-    vec3(1.0, 1.0, 0.0),
-    vec3(1.0, 0.0, 1.0),
-    vec3(0.0, 1.0, 1.0),
-    vec3(0.5, 0.5, 0.5),
-    vec3(1.0, 1.0, 1.0),
-};
 
 void main() {
     if (isTextured == 1) {

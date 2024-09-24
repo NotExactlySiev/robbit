@@ -82,22 +82,22 @@ int main(int argc, char **argv)
     char *path = argv[1];
     char *filename = basename(path);
     size_t namelen = strlen(filename); 
-    if (namelen != 10 && namelen != 11)
+    if (namelen != 11 && namelen != 12)
         die("don't know what to do with this file.");
 
     FileType filetype;
-    if (strcmp("COM_DAT.EAR", filename)) {
+    if (!strcmp("COM_DAT.EAR", filename)) {
         filetype = FILE_TYPE_COM_DAT;
-    } else if (strcmp("GRA_DAT.EAR", filename)) {
+    } else if (!strcmp("GRA_DAT.EAR", filename)) {
         filetype = FILE_TYPE_GRA_DAT;
-    } else if (strcmp("_DAT.EAR", filename + namelen - 8)) {
+    } else if (!strcmp("_DAT.EAR", filename + namelen - 8)) {
         filetype = FILE_TYPE_LVL_DAT;
-    } else if (strcmp("_ENE.EAR", filename + namelen - 8)) {
+    } else if (!strcmp("_ENE.EAR", filename + namelen - 8)) {
         filetype = FILE_TYPE_LVL_ENE;
     } else {
         die("don't know what to do with this file.");
     }
-    //printf("%s\n", filename);
+
     FILE *fd = fopen(path, "r");
     fseek(fd, 0, SEEK_END);
     size_t filesize = ftell(fd);

@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 
     RobbitLevel level = {0};
     convert_level(&level, &parsed.levels[0]);
-    dump_objset(&level.objs);
+    //dump_objset(&level.objs);
 
     VertexAttr vert_attrs[] = {
         { offsetof(RobbitVertex, pos),      VK_FORMAT_R16G16B16_SNORM },

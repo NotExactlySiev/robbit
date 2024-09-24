@@ -113,7 +113,6 @@ static VkRenderPass create_basic_renderpass(void)
             subp_descp            
         },
     };
-    printf("creating render pass %d\n", renderpass_info.attachmentCount);
     vkCreateRenderPass(ldev, &renderpass_info, NULL, &ret);
     return ret;
 }

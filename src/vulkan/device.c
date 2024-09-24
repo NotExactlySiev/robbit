@@ -34,19 +34,18 @@ VkDevice create_vulkan_device(VkInstance inst, VkSurfaceKHR surface, VkPhysicalD
     vkGetPhysicalDeviceQueueFamilyProperties(*pdev, &queue_family_count, NULL);
     VkQueueFamilyProperties queue_family_prop[queue_family_count];
     vkGetPhysicalDeviceQueueFamilyProperties(*pdev, &queue_family_count, queue_family_prop);
-    printf("Found %d Queue families\n", queue_family_count);
-
-    printf("\t\t\t\tE D P B T C G\n");
+    //printf("Found %d Queue families\n", queue_family_count);
+    //printf("\t\t\t\tE D P B T C G\n");
     for (int i = 0; i < queue_family_count; i++)
     {
         qp = queue_family_prop + i;
         qflags = qp->queueFlags;
-        printf("Family %d: %d queues\t%d bits\t", i, qp->queueCount, qp->timestampValidBits);
+        /*printf("Family %d: %d queues\t%d bits\t", i, qp->queueCount, qp->timestampValidBits);
         for (int j = 0x40; j > 0; j >>= 1)
         {
             printf("%c ", qflags & j ? 'X' : ' ');
         }
-        printf("\n");
+        printf("\n");*/
 
         // pick a queue that can do graphics
         if (qflags & VK_QUEUE_GRAPHICS_BIT) {

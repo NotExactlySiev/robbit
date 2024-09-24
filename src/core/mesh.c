@@ -239,8 +239,8 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
 
                     u32 key = (tw & 0xFFFFF) | (page << 20);
                     if (reps[key] == 0) {
-                        printf("PAGE %d ", page);
-                        printf("REP %d\t%d\t%d\t%d\n", x, y, w, h);
+                        //printf("PAGE %d ", page);
+                        //printf("REP %d\t%d\t%d\t%d\n", x, y, w, h);
                         Image subimg = extract_tile(&set->texture.images[page], x, y, w, h);
                         VkImageView view = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
                         set->texture.images[ntex] = subimg;

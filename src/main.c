@@ -25,8 +25,6 @@ const char* content_strings[] = {
 
 SDL_Window *window;
 
-// this should take in an aloha texture
-//Image to_vulkan_image(void *data, u16 *clut)
 Image to_vulkan_image(AlohaTexture *src)
 {
     void *bitmap = src->bitmap_node->buf;
@@ -89,11 +87,6 @@ int main(int argc, char **argv)
     RobbitLevel level = {0};
     convert_level(&level, &parsed.levels[0]);
 
-    // convert to the format vulkan likes
-    // TODO: should the conversion be a two step process? first flatten the mesh
-    // to one array of AlohaFace without groups/subgroups.
-    // then apply other adjustments from there (divide by 3 etc.)
-
     VertexAttr vert_attrs[] = {
         { 0,                                VK_FORMAT_R16G16B16_SNORM },
         { offsetof(RobbitVertex, col),      VK_FORMAT_R8G8B8_UNORM },
@@ -107,13 +100,6 @@ int main(int argc, char **argv)
     RobbitTexture texture = {
         .n = 0,
     };
-    //texture.images[0] = 
-    /*Image teximage = to_vulkan_image(&parsed.levels->objs.tex[0]);
-    image_set_layout(&teximage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    VkImageView texview = image_create_view(teximage, VK_IMAGE_ASPECT_COLOR_BIT);*/
-
-    //Image subimg = extract_tile(&teximage, 128, 64, 64, 64);
-    //texview = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
 
     VkSampler sampler;
     vkCreateSampler(ldev, &(VkSamplerCreateInfo){
@@ -132,7 +118,7 @@ int main(int argc, char **argv)
     } Uniform;
 
     VkResult rc;
-    VkDescriptorSet desc_sets[max_frames];
+    VkDescriptorSet desc_sets[FRAMES_IN_FLIGHT];
     rc = vkAllocateDescriptorSets(ldev, &(VkDescriptorSetAllocateInfo){
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = descpool,
@@ -140,17 +126,14 @@ int main(int argc, char **argv)
         .pSetLayouts = (VkDescriptorSetLayout[]) { pipe.set, pipe.set, pipe.set, pipe.set },
     }, desc_sets);
 
-    Buffer uniform_buffers[max_frames];
-    Uniform *uniforms[max_frames];
+    Buffer uniform_buffers[FRAMES_IN_FLIGHT];
+    Uniform *uniforms[FRAMES_IN_FLIGHT];
 
     // TODO: we should be able to just tell the vulkan module what type of
     // uniform we want and just be given a pointer at present time along
     // with the command buffer. (current frame present context should be
     // returned as a seperate struct?)
-    // TODO: before that, FIGURE OUT HOW FRAMES IN FLIGHT WORKS AHHHHHH
-    // what things need to be repeated and how many times? wrap anything we
-    // don't actually need to interact with inside the vulkan module
-    for (int i = 0; i < max_frames; i++) {
+    for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
         uniform_buffers[i] = create_buffer(sizeof(Uniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(ldev, uniform_buffers[i].mem, 0, sizeof(Uniform), 0, (void**) &uniforms[i]);
 
@@ -209,8 +192,7 @@ int main(int argc, char **argv)
         vkUpdateDescriptorSets(ldev, 3, writes, 0, NULL);
     }
 
-    PresentContext ctx = {0};
-    present_init(&ctx);
+    present_init();
 
     bool running = true;
     float t = 1.0;
@@ -246,6 +228,7 @@ int main(int argc, char **argv)
 
             case SDL_WINDOWEVENT:
                 if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    // works fine for now, don't need this.
                     //framebuffer_resized = false;
                 }
                 break;
@@ -266,19 +249,20 @@ int main(int argc, char **argv)
         }
 
         t += 0.02;
-        uniforms[ctx.current_frame]->angle = t;
-        uniforms[ctx.current_frame]->zoom = zoom;
+        // TODO: uniforms should also be managed by the present module?
+        uniforms[curr_frame]->angle = t;
+        uniforms[curr_frame]->zoom = zoom;
 
-        present_acquire(&ctx);
+        present_acquire();
         // TODO: current extent should be easier to access
-        uniforms[ctx.current_frame]->ratio = 
+        uniforms[curr_frame]->ratio = 
             (float) surface.cap.currentExtent.height / surface.cap.currentExtent.width;
 
-        VkCommandBuffer cbuf = present_begin_pass(&ctx);
+        VkCommandBuffer cbuf = present_begin_pass();
 
         // TODO: wrappity wrap wrap
         vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.vk);        
-        vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[ctx.current_frame], 0, NULL);
+        vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[curr_frame], 0, NULL);
         // TODO: why do we need to pass the pipeline into this? I just wanna
         // push some numbers
         switch (view_mode) {
@@ -290,17 +274,16 @@ int main(int argc, char **argv)
             draw_mesh(cbuf, &level.objs.normal[mesh_id]);
         }
 
-        present_end_pass(&ctx);
-        present_submit(&ctx);
+        present_end_pass();
+        present_submit();
 
         TracyCFrameMarkEnd("Frame");
-        //fflush(stdout);
     }
 
-    present_terminate(&ctx);
+    present_terminate();
     vkDestroySampler(ldev, sampler, NULL);
 
-    for (int i = 0; i < max_frames; i++) {
+    for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
         destroy_buffer(uniform_buffers[i]);
     }
 

@@ -11,15 +11,14 @@
 //#define TRACY_ENABLE
 
 #define MAX_IMAGES  4
-#define max_frames  2
+#define FRAMES_IN_FLIGHT  2
 
 #define VK_CHECK_ERR(error)    { if (rc != VK_SUCCESS) printf(error ": %d\n", rc); }
 
+// TODO: merge these two
 typedef struct {
     VkSwapchainKHR vk;
     uint32_t nimages;
-    //VkImage images[MAX_IMAGES]; // unwrapped! do we even need to keep it?
-    //VkImageView views[MAX_IMAGES];
 } Swapchain;
 
 typedef struct {
@@ -56,16 +55,27 @@ typedef struct {
     VkFormat format;
 } VertexAttr;
 
+/*
 typedef struct {
-    VkSemaphore semps_img_avl[max_frames];
-    VkSemaphore semps_rend_fin[max_frames];
-    VkFence queue_fences[max_frames];
-    VkCommandBuffer cmdbufs[max_frames];
+    VkSemaphore semps_img_avl[FRAMES_IN_FLIGHT];
+    VkSemaphore semps_rend_fin[FRAMES_IN_FLIGHT];
+    VkFence queue_fences[FRAMES_IN_FLIGHT];
+    VkCommandBuffer cmdbufs[FRAMES_IN_FLIGHT];
     
     VkCommandBuffer current_cmdbuf;
     int current_frame;
     uint32_t image_index;
 } PresentContext;
+*/
+
+typedef struct {
+    VkSemaphore image_acquired;
+    VkSemaphore render_finished;
+    VkFence queue_done;
+    VkCommandBuffer cbuf;
+} PresentContext;
+
+extern u32 curr_frame;
 
 extern VkFramebuffer framebuffers[MAX_IMAGES];
 void create_framebuffers(Swapchain *sc);
@@ -110,12 +120,12 @@ VkImageView image_create_view(Image img, VkImageAspectFlags aspect);
 Swapchain create_swapchain(void);
 void destroy_swapchain(Swapchain sc);
 
-void present_init(PresentContext *ctx);
-void present_terminate(PresentContext *ctx);
-void present_acquire(PresentContext *ctx);
-void present_submit(PresentContext *ctx);
-void present_end_pass(PresentContext *ctx);
-VkCommandBuffer present_begin_pass(PresentContext *ctx);
+void present_init(void);
+void present_terminate(void);
+void present_acquire(void);
+void present_submit(void);
+void present_end_pass(void);
+VkCommandBuffer present_begin_pass(void);
 
 // redner commands
 typedef struct {

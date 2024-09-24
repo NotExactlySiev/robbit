@@ -196,34 +196,45 @@ VkFence create_fence(bool signaled)
     return ret;
 }
 
-void present_init(PresentContext *ctx)
+u32 curr_frame;
+static u32 curr_image;
+static PresentContext present_ctx[FRAMES_IN_FLIGHT];
+
+#define curr    (&present_ctx[curr_frame])
+
+/*
+PresentContext *curr(void)
 {
-    ctx->current_frame = 0;
-    
-    create_framebuffers(&swapchain);
-    VkCommandBufferAllocateInfo command_buf_alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = cmdpool,
-        .commandBufferCount = max_frames,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-    };
+    return &present_ctx[curr_frame];
+}
+*/
 
-    vkAllocateCommandBuffers(ldev, &command_buf_alloc_info, ctx->cmdbufs);
+//static PresentContext *curr;
 
-    for (int i = 0; i < max_frames; i++) {
-        ctx->semps_img_avl[i] = create_semaphore();
-        ctx->semps_rend_fin[i] = create_semaphore();
-        ctx->queue_fences[i] = create_fence(true);
+void present_init(void)
+{
+    create_framebuffers(&swapchain);    // this shouldn't be here? go in SC?
+    for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        vkAllocateCommandBuffers(ldev, &(VkCommandBufferAllocateInfo) {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .commandPool = cmdpool,
+            .commandBufferCount = 1,
+            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        }, &present_ctx[i].cbuf);
+        present_ctx[i].image_acquired = create_semaphore();
+        present_ctx[i].render_finished = create_semaphore();
+        present_ctx[i].queue_done = create_fence(true);
     }
+    curr_frame = 0;
 }
 
-void present_terminate(PresentContext *ctx)
+void present_terminate(void)
 {
     vkDeviceWaitIdle(ldev);
-    for (int i = 0; i < max_frames; i++) {
-        vkDestroySemaphore(ldev, ctx->semps_img_avl[i], NULL);
-        vkDestroySemaphore(ldev, ctx->semps_rend_fin[i], NULL);
-        vkDestroyFence(ldev, ctx->queue_fences[i], NULL);
+    for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(ldev, present_ctx[i].image_acquired, NULL);
+        vkDestroySemaphore(ldev, present_ctx[i].render_finished, NULL);
+        vkDestroyFence(ldev, present_ctx[i].queue_done, NULL);
     }
     destroy_framebuffers(&swapchain);
 }
@@ -235,7 +246,7 @@ void destroy_swapchain(Swapchain sc)
 
 extern SDL_Window *window;
 
-void recreate_swapchain(PresentContext *ctx)
+void recreate_swapchain(void)
 {
     vkDeviceWaitIdle(ldev);
     destroy_framebuffers(&swapchain);
@@ -247,30 +258,25 @@ void recreate_swapchain(PresentContext *ctx)
     create_framebuffers(&swapchain);
 }
 
-void present_acquire(PresentContext *ctx)
+void present_acquire(void)
 {
     VkResult rc;
-    vkWaitForFences(ldev, 1 ,&ctx->queue_fences[ctx->current_frame], VK_TRUE, UINT64_MAX);
+    vkWaitForFences(ldev, 1 , &curr->queue_done, VK_TRUE, UINT64_MAX);
 
 again:
     rc = vkAcquireNextImageKHR(ldev, swapchain.vk, UINT64_MAX,
-        ctx->semps_img_avl[ctx->current_frame], VK_NULL_HANDLE,
-        &ctx->image_index);
+        curr->image_acquired, VK_NULL_HANDLE,
+        &curr_image);
     
     switch (rc) {
     case VK_SUCCESS:
-        //printf("is correct!\n");
         break;
         
     case VK_ERROR_OUT_OF_DATE_KHR:
-        printf("out of date :(\n");
-//        exit(1);
-  //      break;
-
     case VK_SUBOPTIMAL_KHR:
-        vkDestroySemaphore(ldev, ctx->semps_img_avl[ctx->current_frame], NULL);
-        ctx->semps_img_avl[ctx->current_frame] = create_semaphore();
-        recreate_swapchain(ctx);
+        vkDestroySemaphore(ldev, curr->image_acquired, NULL);
+        curr->image_acquired = create_semaphore();
+        recreate_swapchain();
         goto again;
         break;
 
@@ -279,14 +285,11 @@ again:
         assert(0);
     }
 
-    vkResetFences(ldev, 1, &ctx->queue_fences[ctx->current_frame]);
-    //printf("SEM %x will be signaled\n", ctx->semps_img_avl[ctx->current_frame]);
-
-    ctx->current_cmdbuf = ctx->cmdbufs[ctx->current_frame];
-	vkBeginCommandBuffer(ctx->current_cmdbuf, &(VkCommandBufferBeginInfo){
+    vkResetFences(ldev, 1, &curr->queue_done);
+	vkBeginCommandBuffer(curr->cbuf, &(VkCommandBufferBeginInfo){
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
     });
-    vkCmdSetViewport(ctx->current_cmdbuf, 0, 1, &(VkViewport){
+    vkCmdSetViewport(curr->cbuf, 0, 1, &(VkViewport){
         .x = 0.0,
         .y = 0.0,
         .width = surface.cap.currentExtent.width,
@@ -294,18 +297,18 @@ again:
         .minDepth = 0.0,
         .maxDepth = 1.0,
     });
-    vkCmdSetScissor(ctx->current_cmdbuf, 0, 1, &(VkRect2D) {
+    vkCmdSetScissor(curr->cbuf, 0, 1, &(VkRect2D) {
         .offset = { 0, 0 },
         .extent = surface.cap.currentExtent,
     });
 }
 
-VkCommandBuffer present_begin_pass(PresentContext *ctx)
+VkCommandBuffer present_begin_pass(void)
 {
-    vkCmdBeginRenderPass(ctx->current_cmdbuf, &(VkRenderPassBeginInfo) {
+    vkCmdBeginRenderPass(curr->cbuf, &(VkRenderPassBeginInfo) {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = default_renderpass,
-        .framebuffer = framebuffers[ctx->image_index],
+        .framebuffer = framebuffers[curr_image],
         .renderArea.extent = surface.cap.currentExtent,
         .clearValueCount = 2,
         .pClearValues = (VkClearValue[])  {
@@ -313,40 +316,40 @@ VkCommandBuffer present_begin_pass(PresentContext *ctx)
             { .depthStencil = { .depth = 0.0f } },
         },
     }, VK_SUBPASS_CONTENTS_INLINE);
-    return ctx->current_cmdbuf;
+    return curr->cbuf;
 }
 
-void present_end_pass(PresentContext *ctx)
+void present_end_pass(void)
 {
-    vkCmdEndRenderPass(ctx->current_cmdbuf);
-    vkEndCommandBuffer(ctx->current_cmdbuf);
+    vkCmdEndRenderPass(curr->cbuf);
+    vkEndCommandBuffer(curr->cbuf);
 }
 
-void present_submit(PresentContext *ctx)
+void present_submit(void)
 {
     VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
     vkQueueSubmit(queue, 1, (VkSubmitInfo[]) {{
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &ctx->semps_img_avl[ctx->current_frame],
+        .pWaitSemaphores = &curr->image_acquired,
         .pWaitDstStageMask = &wait_stage,
         .commandBufferCount = 1,
-        .pCommandBuffers = &ctx->cmdbufs[ctx->current_frame],
+        .pCommandBuffers = &curr->cbuf,
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &ctx->semps_rend_fin[ctx->current_frame],
-    }}, ctx->queue_fences[ctx->current_frame]);
+        .pSignalSemaphores = &curr->render_finished,
+    }}, curr->queue_done);
 
     VkPresentInfoKHR present_info = {
 	    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &ctx->semps_rend_fin[ctx->current_frame],
+        .pWaitSemaphores = &curr->render_finished,
         .swapchainCount = 1,
         .pSwapchains = &swapchain.vk,
-        .pImageIndices = &ctx->image_index,
+        .pImageIndices = &curr_image,
     };
 
     vkQueuePresentKHR(queue, &present_info);
     SDL_GL_SwapWindow(window);
-    ctx->current_frame = (ctx->current_frame + 1) % max_frames;
+    curr_frame = (curr_frame + 1) % FRAMES_IN_FLIGHT;
 }

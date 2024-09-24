@@ -121,6 +121,7 @@ static int extract_faces(AlohaFace *dst, RobbitMesh *mesh)
 
 void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
 {
+    assert(mesh->vert_buffer.vk != VK_NULL_HANDLE);
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cbuf, 0, 1, &mesh->vert_buffer.vk, &offset);
     vkCmdDraw(cbuf, mesh->vert_count, 1, 0, 0);
@@ -179,12 +180,21 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
     u8 reps[1 << 21] = {0};
     
     u16 *clut_data = src->clut_node->buf;
-    parse_file(src->mesh_nodes[0]->buf, set->normal);
-    // TODO: load LODs too, if they exist
-    //parse_file(src->mesh_nodes[1]->buf, set->lod);
+    
+    set->nlod = 0;
+    for (int i = 0; i < OBJSET_MAX_MESH; i++) {
+        if (src->mesh_nodes[i] == NULL) break;
+        set->nlod += 1;
+        parse_file(src->mesh_nodes[i]->buf, set->lod[i]);
+    }
     
     for (int i = 0; i < 128; i++) {
-        RobbitMesh *m = &set->normal[i];
+        /*RobbitMesh *m;
+        for (int j = 0; j < set->nlod; j++) {
+            m = &set->lod[j][i];
+            if (!m->empty) break;
+        }*/
+        RobbitMesh *m = &set->lod[0][i];
         if (m->empty) continue;
         int nfaces = extract_faces(NULL, m);
         AlohaFace faces[nfaces];
@@ -255,11 +265,14 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
         }
 
         assert(nprims < 2048);
+        assert(nprims > 0);
 
         m->vert_count = 3 * nprims;
         int vert_size = m->vert_count * sizeof(RobbitVertex);
         Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        assert(vert_buf.vk != VK_NULL_HANDLE);
         buffer_write(vert_buf, vert_size, vkverts);
+        
         m->vert_buffer = vert_buf;
     }
 
@@ -269,13 +282,13 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
 void destroy_objset(RobbitObjSet *set)
 {
     for (int i = 0; i < 128; i++) {
-        if (set->normal[i].empty) continue;
-        destroy_buffer(set->normal[i].vert_buffer);
+        if (set->lod[0][i].empty) continue;
+        destroy_buffer(set->lod[0][i].vert_buffer);
     }
 
     for (int i = 0; i < 128; i++) {
-        if (set->lod[i].empty) continue;
-        destroy_buffer(set->lod[i].vert_buffer);
+        if (set->lod[1][i].empty) continue;
+        destroy_buffer(set->lod[1][i].vert_buffer);
     }
 
     for (int i = 0; i < set->texture.n; i++) {
@@ -286,26 +299,18 @@ void destroy_objset(RobbitObjSet *set)
 
 void dump_objset(RobbitObjSet *set)
 {
+    for (int i = 0; i < set->nlod; i++) {
+        printf("\tLOD %d", i);
+    }
+    printf("\n");
     for (int i = 0; i < 128; i++) {
         printf("%03d:\t", i);
-        if (set->normal[i].empty)
-            printf("---\t");
-        else
-            printf("%d\t", set->normal[i].nverts);
-            
-        if (set->lod[i].empty)
-            printf("---\t");
-        else
-            printf("%d\t", set->lod[i].nverts);
-
-        bool normal = !set->normal[i].empty;
-        bool lod = !set->lod[i].empty;
-
-        if (normal) {
-            if (lod) printf("Exists");
-            else printf("Exists (No LOD)");
-        } else {
-            if (lod) printf("!!! Only LOD");
+        
+        for (int j = 0; j < set->nlod; j++) {
+            if (set->lod[j][i].empty)
+                printf("---\t");
+            else
+                printf("%d\t", set->lod[j][i].nverts);
         }
         printf("\n");
     }

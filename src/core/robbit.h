@@ -6,7 +6,7 @@
 #include "mesh.h"
 
 #define ENE_MAX_OBJS    16
-#define STAGE_MAX_GEOM  2048
+#define STAGE_MAX_GEOM  4096
 #define OBJSET_MAX_MESH 4
 
 #define CONTENTS                    \
@@ -97,8 +97,10 @@ typedef struct {
 } RobbitStage;
 
 typedef struct {
-    RobbitMesh normal[128];
-    RobbitMesh lod[128];
+    /*RobbitMesh normal[128];
+    RobbitMesh lod[128];*/
+    int nlod;
+    RobbitMesh lod[OBJSET_MAX_MESH][128];
     RobbitTexture texture;
 } RobbitObjSet;
 

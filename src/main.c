@@ -89,6 +89,7 @@ int main(int argc, char **argv)
 
     RobbitLevel level = {0};
     convert_level(&level, &parsed.levels[0]);
+    dump_objset(&level.objs);
 
     VertexAttr vert_attrs[] = {
         { 0,                                VK_FORMAT_R16G16B16_SNORM },
@@ -212,7 +213,7 @@ int main(int argc, char **argv)
                 } else if (event.key.keysym.sym == SDLK_RIGHT) {
                     do {
                         mesh_id = (mesh_id + 1) % 128;
-                    } while (level.objs.normal[mesh_id].empty);
+                    } while (level.objs.lod[0][mesh_id].empty);
                     printf("MESH %d\n", mesh_id);
                 } else if (event.key.keysym.sym == SDLK_TAB) {
                     view_mode = 1 - view_mode;
@@ -269,7 +270,7 @@ int main(int argc, char **argv)
             break;
         case 1:
             push_const(cbuf, &pipe, (PushConst) { 0, 0, 0 });
-            draw_mesh(cbuf, &level.objs.normal[mesh_id]);
+            draw_mesh(cbuf, &level.objs.lod[0][mesh_id]);
         }
 
         present_end_pass();

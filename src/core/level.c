@@ -58,7 +58,6 @@ static void geom_unpack(void *data, GeomObj *out)
         if (off == 0) continue;
         ObjBlock *p = data + off;
         u16 count = p->count;
-        //GeomObj *objs = p + 1;
         for (int j = 0; j < count; j++) {
             out[n++] = p->objs[j];
         }
@@ -96,12 +95,18 @@ void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
 {
     for (int i = 0; i < level->stage.geom.n; i++) {
         GeomObj *obj = &level->stage.geom.objs[i];
-        if (level->objs.normal[obj->id].empty) continue;
+        if (level->objs.lod[0][obj->id].empty) continue;
         push_const(cbuf, pipe, (PushConst) {
             .x = ((float) obj->x) / INT16_MAX,
             .y = ((float) obj->y) / INT16_MAX,
             .z = ((float) obj->z) / INT16_MAX,
         });
-        draw_mesh(cbuf, &level->objs.normal[obj->id]);
+        /*for (int j = 0; j < level->objs.nlod; j++) {
+            if (!level->objs.lod[j][obj->id].empty) {
+                draw_mesh(cbuf, &level->objs.lod[j][obj->id]);
+                break;
+            }
+        }*/
+        draw_mesh(cbuf, &level->objs.lod[0][obj->id]);
     }
 }

@@ -3,81 +3,145 @@
 // abstract swapchain and ALL behind the framebuffer module...? present doesn't
 // need to directly worry about the images even.
 
-// TODO: why is the framebuffer module here :/
-// FIXME: these globals are yucky
-static Image zimages[MAX_IMAGES];
-static VkImageView colorviews[MAX_IMAGES];
-static VkImageView zviews[MAX_IMAGES];
-VkFramebuffer framebuffers[MAX_IMAGES];
+u32 curr_frame;
+static u32 curr_image;
+static PresentContext present_ctx[FRAMES_IN_FLIGHT];
 
-// void create_framebuffer(VkImage swapchain_image) {...}
+#define curr    (&present_ctx[curr_frame])
 
-// create the framebuffers we need from the swapchain given to this
-void create_framebuffers(Swapchain *sc)
+void present_init(void)
 {
-    VkResult rc;
-    // we don't need to keep swapchain images around. they're taken care of
-    vkGetSwapchainImagesKHR(ldev, sc->vk, &sc->nimages, NULL);
-    VkImage images[sc->nimages];
-    vkGetSwapchainImagesKHR(ldev, sc->vk, &sc->nimages, images);
-    VK_CHECK_ERR("Can't get images from swapchain");
-
-    VkImageViewCreateInfo view_info = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .flags = 0,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = VK_FORMAT_B8G8R8A8_SRGB,
-        .components = { 
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-        },
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        }
-    };
-
-    for (int i = 0; i < sc->nimages; i++) {
-        // abstract this call to create image view
-        view_info.image = images[i];
-        rc = vkCreateImageView(ldev, &view_info, NULL, &colorviews[i]);
-        VK_CHECK_ERR("Can't create image view");
-
-        zimages[i] = create_image(
-            // TODO: these should come from the swapchain not outside
-            surface.cap.currentExtent.width,
-            surface.cap.currentExtent.height,
-            VK_FORMAT_D32_SFLOAT_S8_UINT,
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-        zviews[i] = image_create_view(zimages[i], VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-
-        VkFramebufferCreateInfo framebuffer_info = {
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass = default_renderpass,
-            .attachmentCount = 2,
-            .pAttachments = (VkImageView[]) {
-                colorviews[i],
-                zviews[i],
-            },
-            .width = surface.cap.currentExtent.width,
-            .height = surface.cap.currentExtent.height,
-            .layers = 1,
-        };
-        vkCreateFramebuffer(ldev, &framebuffer_info, NULL, &framebuffers[i]);
+    create_framebuffers(&swapchain);    // this shouldn't be here? go in SC?
+    for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        vkAllocateCommandBuffers(ldev, &(VkCommandBufferAllocateInfo) {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .commandPool = cmdpool,
+            .commandBufferCount = 1,
+            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        }, &present_ctx[i].cbuf);
+        present_ctx[i].image_acquired = create_semaphore();
+        present_ctx[i].render_finished = create_semaphore();
+        present_ctx[i].queue_done = create_fence(true);
     }
+    curr_frame = 0;
 }
 
-void destroy_framebuffers(Swapchain *sc)
+void present_terminate(void)
 {
-    for (int i = 0; i < sc->nimages; i++) {
-        vkDestroyFramebuffer(ldev, framebuffers[i], NULL);
-        vkDestroyImageView(ldev, colorviews[i], NULL);
-        vkDestroyImageView(ldev, zviews[i], NULL);
-        destroy_image(zimages[i]);
+    vkDeviceWaitIdle(ldev);
+    for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(ldev, present_ctx[i].image_acquired, NULL);
+        vkDestroySemaphore(ldev, present_ctx[i].render_finished, NULL);
+        vkDestroyFence(ldev, present_ctx[i].queue_done, NULL);
     }
+    destroy_framebuffers(&swapchain);
+}
+
+void destroy_swapchain(Swapchain sc)
+{
+    vkDestroySwapchainKHR(ldev, sc.vk, NULL);
+}
+
+extern SDL_Window *window;
+
+void recreate_swapchain(void)
+{
+    vkDeviceWaitIdle(ldev);
+    destroy_framebuffers(&swapchain);
+    destroy_swapchain(swapchain);
+    vkDestroySurfaceKHR(inst, surface.vk, NULL);
+
+    SDL_Vulkan_CreateSurface(window, inst, &surface.vk);    
+    swapchain = create_swapchain();
+    create_framebuffers(&swapchain);
+}
+
+VkCommandBuffer present_acquire(void)
+{
+    VkResult rc;
+    vkWaitForFences(ldev, 1 , &curr->queue_done, VK_TRUE, UINT64_MAX);
+
+again:
+    rc = vkAcquireNextImageKHR(ldev, swapchain.vk, UINT64_MAX,
+        curr->image_acquired, VK_NULL_HANDLE,
+        &curr_image);
+    
+    switch (rc) {
+    case VK_SUCCESS:
+        break;
+        
+    case VK_ERROR_OUT_OF_DATE_KHR:
+    case VK_SUBOPTIMAL_KHR:
+        vkDestroySemaphore(ldev, curr->image_acquired, NULL);
+        curr->image_acquired = create_semaphore();
+        recreate_swapchain();
+        goto again;
+        break;
+
+    default:
+        printf("can't acquire. %d\n", rc);
+        assert(0);
+    }
+
+    vkResetFences(ldev, 1, &curr->queue_done);
+	vkBeginCommandBuffer(curr->cbuf, &(VkCommandBufferBeginInfo){
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    });
+    vkCmdSetViewport(curr->cbuf, 0, 1, &(VkViewport){
+        .x = 0.0,
+        .y = 0.0,
+        .width = surface.cap.currentExtent.width,
+        .height = surface.cap.currentExtent.height,
+        .minDepth = 0.0,
+        .maxDepth = 1.0,
+    });
+    vkCmdSetScissor(curr->cbuf, 0, 1, &(VkRect2D) {
+        .offset = { 0, 0 },
+        .extent = surface.cap.currentExtent,
+    });
+
+    vkCmdBeginRenderPass(curr->cbuf, &(VkRenderPassBeginInfo) {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .renderPass = default_renderpass,
+        .framebuffer = framebuffers[curr_image],
+        .renderArea.extent = surface.cap.currentExtent,
+        .clearValueCount = 2,
+        .pClearValues = (VkClearValue[])  {
+            { .color = { .float32 = { 0.1f, 0.15f, 0.1f, 0.0f } } },
+            { .depthStencil = { .depth = 0.0f } },
+        },
+    }, VK_SUBPASS_CONTENTS_INLINE);
+    return curr->cbuf;
+}
+
+void present_submit(void)
+{
+    vkCmdEndRenderPass(curr->cbuf);
+    vkEndCommandBuffer(curr->cbuf);
+
+    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    vkQueueSubmit(queue, 1, (VkSubmitInfo[]) {{
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &curr->image_acquired,
+        .pWaitDstStageMask = &wait_stage,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &curr->cbuf,
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = &curr->render_finished,
+    }}, curr->queue_done);
+
+    VkPresentInfoKHR present_info = {
+	    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &curr->render_finished,
+        .swapchainCount = 1,
+        .pSwapchains = &swapchain.vk,
+        .pImageIndices = &curr_image,
+    };
+
+    vkQueuePresentKHR(queue, &present_info);
+    SDL_GL_SwapWindow(window);
+    curr_frame = (curr_frame + 1) % FRAMES_IN_FLIGHT;
 }

@@ -26,6 +26,8 @@ typedef enum EarContent {
 #undef O
 } EarContent;
 
+EarContent guess_content_base(EarNode *node);
+
 extern const char *content_strings[];
 
 typedef struct {

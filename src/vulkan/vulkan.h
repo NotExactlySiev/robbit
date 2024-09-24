@@ -1,10 +1,10 @@
 #ifndef _VULKAN_H
 #define _VULKAN_H
 
-#include <types.h>
-#include <string.h>
-#include <SDL.h>
+#include "../common.h"
 #include <vulkan/vulkan.h>
+#include <SDL.h>
+#include <SDL_vulkan.h>
 #include <tracy/TracyC.h>
 
 #define MAX_IMAGES  4
@@ -85,6 +85,8 @@ void destroy_app(void);
 Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs);
 void destroy_pipeline(Pipeline pipe);
 
+VkSemaphore create_semaphore(void);
+VkFence create_fence(bool signaled);
 VkCommandBuffer begin_tmp_cmdbuf(void);
 void end_tmp_cmdbuf(VkCommandBuffer buf);
 
@@ -106,10 +108,8 @@ void destroy_swapchain(Swapchain sc);
 
 void present_init(void);
 void present_terminate(void);
-void present_acquire(void);
+VkCommandBuffer present_acquire(void);
 void present_submit(void);
-void present_end_pass(void);
-VkCommandBuffer present_begin_pass(void);
 
 // redner commands
 typedef struct {

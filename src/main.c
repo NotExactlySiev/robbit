@@ -1,5 +1,4 @@
-#include <types.h>
-#include <stdio.h>
+#include "common.h"
 #include <SDL.h>
 #include <SDL_vulkan.h>
 
@@ -202,8 +201,7 @@ int main(int argc, char **argv)
     int view_mode = 0;
 
     while (running) {
-        TracyCFrameMarkStart("Frame");
-
+        TracyCFrameMark
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
@@ -252,12 +250,12 @@ int main(int argc, char **argv)
         uniforms[curr_frame]->angle = t;
         uniforms[curr_frame]->zoom = zoom;
 
-        present_acquire();
+        VkCommandBuffer cbuf = present_acquire();
         // TODO: current extent should be easier to access
         uniforms[curr_frame]->ratio = 
             (float) surface.cap.currentExtent.height / surface.cap.currentExtent.width;
 
-        VkCommandBuffer cbuf = present_begin_pass();
+        //VkCommandBuffer cbuf = present_begin_pass();
 
         // TODO: wrappity wrap wrap
         vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.vk);        
@@ -273,10 +271,8 @@ int main(int argc, char **argv)
             draw_mesh(cbuf, &level.objs.lod[0][mesh_id]);
         }
 
-        present_end_pass();
+        //present_end_pass();
         present_submit();
-
-        TracyCFrameMarkEnd("Frame");
     }
 
     present_terminate();

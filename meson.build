@@ -5,6 +5,7 @@ sources = files([
   'src/vulkan/buffer.c', 'src/vulkan/device.c', 'src/vulkan/image.c',
   'src/vulkan/memory.c', 'src/vulkan/descriptor.c', 'src/vulkan/vulkan.c',
   'src/vulkan/pipeline.c', 'src/vulkan/swapchain.c', 'src/vulkan/present.c',
+  'src/vulkan/framebuffer.c',
   'src/core/level.c', 'src/core/mesh.c', 'src/core/aloha.c',
 ])
 

@@ -49,8 +49,12 @@ vulkan_dep = dependency('vulkan', static: true)
 tracy_dep = dependency('tracy', static: true)
 imgui_dep = dependency('imgui', static: true)
 
-if get_option('tracy_enable') and get_option('buildtype') != 'debugoptimized'
-  warning('buildtype not set')
+if get_option('tracy_enable')
+  # you have to do this manually. the tracy docs lied to me :(
+  add_project_arguments('-DTRACY_ENABLE', language : ['c', 'cpp'])
+  if get_option('buildtype') != 'debugoptimized'
+    warning('buildtype not set')
+  endif 
 endif
 
 executable('robbit', sources, 

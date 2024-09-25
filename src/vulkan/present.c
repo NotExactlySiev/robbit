@@ -65,7 +65,6 @@ again:
     rc = vkAcquireNextImageKHR(ldev, swapchain.vk, UINT64_MAX,
         curr->image_acquired, VK_NULL_HANDLE,
         &curr_image);
-    
     switch (rc) {
     case VK_SUCCESS:
         break;
@@ -116,6 +115,7 @@ again:
 
 void present_submit(void)
 {
+    ZONE(QueueSubmit);
     vkCmdEndRenderPass(curr->cbuf);
     vkEndCommandBuffer(curr->cbuf);
 
@@ -131,7 +131,9 @@ void present_submit(void)
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = &curr->render_finished,
     }}, curr->queue_done);
+    UNZONE(QueueSubmit);
 
+    ZONE(QueuePresent)
     VkPresentInfoKHR present_info = {
 	    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = 1,
@@ -140,8 +142,12 @@ void present_submit(void)
         .pSwapchains = &swapchain.vk,
         .pImageIndices = &curr_image,
     };
-
     vkQueuePresentKHR(queue, &present_info);
+    UNZONE(QueuePresent)
+
+    ZONE(Swap)
     SDL_GL_SwapWindow(window);
+    UNZONE(Swap)
+    TracyCFrameMark
     curr_frame = (curr_frame + 1) % FRAMES_IN_FLIGHT;
 }

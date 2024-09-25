@@ -61,4 +61,10 @@ static inline _Color color_15_to_24(u16 col)
     };
 }
 
+// profiling
+// TODO: some sort of hashing for this?
+#define STR_TO_COLOR(str)   ((str[0] << 16) | (str[1] << 8) | (str[2] << 0))
+#define ZONE(n)     TracyCZoneNC(_zone_##n, #n, STR_TO_COLOR(#n), true)
+#define UNZONE(n)   TracyCZoneEnd(_zone_##n);
+
 #endif

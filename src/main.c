@@ -243,7 +243,7 @@ int main(int argc, char **argv)
     int view_mode = 0;
 
     while (running) {
-        TracyCFrameMark
+        ZONE(Events)
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ui_process_event(&event);
@@ -292,22 +292,28 @@ int main(int argc, char **argv)
                 break;
             }
         }
+        UNZONE(Events)
 
-        t += 0.02;
         // TODO: uniforms should also be managed by the present module?
+        ZONE(Acquire)
+        VkCommandBuffer cbuf = present_acquire();
+        UNZONE(Acquire)
+
+        // TODO: current extent should be easier to access
+        t += 0.02;
         uniforms[curr_frame]->angle = t;
         uniforms[curr_frame]->zoom = zoom;
-
-        VkCommandBuffer cbuf = present_acquire();
-        // TODO: current extent should be easier to access
         uniforms[curr_frame]->ratio = 
             (float) surface.cap.currentExtent.height / surface.cap.currentExtent.width;
-
+        
         // TODO: wrappity wrap wrap
         vkCmdBindPipeline(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.vk);        
         vkCmdBindDescriptorSets(cbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.layout, 0, 1, &desc_sets[curr_frame], 0, NULL);
+
+        ZONE(Render)
         // TODO: why do we need to pass the pipeline into this? I just wanna
         // push some numbers
+        ZONE(Main)
         switch (view_mode) {
         case 0:
             draw_level(cbuf, &pipe, &level);
@@ -316,9 +322,16 @@ int main(int argc, char **argv)
             push_const(cbuf, &pipe, (PushConst) { 0, 0, 0 });
             draw_mesh(cbuf, &level.objs.lod[0][mesh_id]);
         }
+        UNZONE(Main)
 
+        ZONE(UI)
         ui_run(ear->nodes, cbuf, pipe.vk);
+        UNZONE(UI)
+        UNZONE(Render)
+
+        ZONE(Submit)
         present_submit();
+        UNZONE(Submit)
     }
     ui_kill();
 

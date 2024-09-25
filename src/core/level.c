@@ -165,6 +165,7 @@ void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
     for (int i = 0; i < level->stage.geom_hi.n; i++) {
         LoDetailObj *obj = &level->stage.geom_hi.objs[i];
         if (level->objs.lod[0][obj->id].empty) continue;
+        ZONE(LevelObject)
         push_const(cbuf, pipe, (PushConst) {
             .x = ((float) obj->x) / INT16_MAX,
             .y = ((float) obj->y) / INT16_MAX,
@@ -177,5 +178,6 @@ void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
             }
         }*/
         draw_mesh(cbuf, &level->objs.lod[0][obj->id]);
+        UNZONE(LevelObject)
     }
 }

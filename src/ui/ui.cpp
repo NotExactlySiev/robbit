@@ -4,7 +4,8 @@
 #include "imgui_impl_vulkan.h"
 
 #include "imgui_memory_editor.h"
-//#include "ImGuiFileDialog.h"
+
+#include <tracy/Tracy.hpp>
 
 #include <vector>
 #include <string>
@@ -287,18 +288,15 @@ void ui_kill(void)
 extern "C"
 bool ui_process_event(SDL_Event *event)
 {
+    ZoneScoped;
     return ImGui_ImplSDL2_ProcessEvent(event);
 }
 
 bool show_demo = false;
-extern "C"
-void ui_run(EarNode *ear, VkCommandBuffer cbuf, VkPipeline pipe)
-{
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    NewFrame();
 
-    // main window
+void main_window(EarNode *ear)
+{
+    ZoneScoped;
     Begin("Bruh");
     //if (ImGui::Button("Save As..."))
     //    ear_save_to_file("savedas.ear", ear);
@@ -321,11 +319,28 @@ void ui_run(EarNode *ear, VkCommandBuffer cbuf, VkPipeline pipe)
     EndTable();
 
     End();
+}
+
+extern "C"
+void ui_run(EarNode *ear, VkCommandBuffer cbuf, VkPipeline pipe)
+{
+    {
+        ZoneScoped;
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        NewFrame();
+    }
+
+
+    // main window
+    main_window(ear);
     
     // demo window
-    if (show_demo)
+    if (show_demo) {
+        ZoneScoped;
         ShowDemoWindow();
-    
+    }
+
     Render();
     ImGui_ImplVulkan_RenderDrawData(GetDrawData(), cbuf);
 }

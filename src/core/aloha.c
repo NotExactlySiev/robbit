@@ -124,26 +124,42 @@ void aloha_parse_texture(AlohaTexture *out, EarNode *clut_node, EarNode *bitmap_
 void aloha_parse_objset(AlohaObjSet *out, EarNode *node)
 {
     out->node = node;
-    EarNode *p = &node->sub[0];
-    out->clut_node = p++;
-    bool tex = p->type == EAR_NODE_TYPE_FILE;
-    EarNode *tex_clut = tex ? p : NULL;
-    p++;
-    for (int i = 0; i < OBJSET_MAX_MESH; i++) {
-        out->mesh_nodes[i] = p++;
-        if (p->type == EAR_NODE_TYPE_SEPARATOR) {
-            p++;
-            break;
-        }
-    }
-
     // TODO: these should probably store how many they find so we don't
-    // duplicate code
-    for (int i = 0; i < 2; i++) {
-        aloha_parse_texture(&out->tex[i], tex_clut, p++);
-        if (p->type == EAR_NODE_TYPE_SEPARATOR) {
-            p++;
+    int nmesh = 0;
+    int ntex = 0;
+    EarNode *tex_clut;
+    int state = 0;
+    for (EarNode *p = &node->sub[0]; p < &node->sub[node->count]; p++) {
+        switch (state) {
+        case 0: // mesh clut
+            out->clut_node = p;
+            state = 1;
             break;
+        
+        case 1: // texture clut (if any)
+            tex_clut = p->type == EAR_NODE_TYPE_FILE ? p : NULL;
+            state = 2;
+            break;
+        
+        case 2: // meshes
+            if (p->type == EAR_NODE_TYPE_FILE) {
+                out->mesh_nodes[nmesh++] = p;
+            } else {
+                state = 3;
+            }
+            break;
+
+        case 3: // textures
+            if (p->type == EAR_NODE_TYPE_FILE) {
+                assert(tex_clut != NULL);
+                aloha_parse_texture(&out->tex[ntex++], tex_clut, p);
+            } else {
+                state = 4;
+            }
+            break;
+
+        case 4: // done
+            die("objset structure incorrect");
         }
     }
 }
@@ -180,4 +196,15 @@ void aloha_parse_dat(DatFile *out, EarNode *node)
     //aloha_parse_level(&out->levels[1], &objsets[1], &stages[1]);
     while ((p++)->type != EAR_NODE_TYPE_SEPARATOR);
     out->demo_node = p;
+}
+
+void aloha_parse_ene(EneFile *out, EarNode *node)
+{
+    assert(node->type == EAR_NODE_TYPE_DIR);
+    out->node = node;
+    out->nobjs = 0;
+    for (EarNode *p = &node->sub[0]; p->type != EAR_NODE_TYPE_SEPARATOR; p++) {
+        aloha_parse_objset(&out->objs[out->nobjs++], p);
+    }
+    printf("%d entity mesh sets found\n", out->nobjs);
 }

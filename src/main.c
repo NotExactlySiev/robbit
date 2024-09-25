@@ -70,6 +70,10 @@ void print_content(EarNode *node)
         printf("\t%s", content_strings[guess_content_base(node)]);
 }
 
+DatFile dat_file;
+EneFile ene_file;
+RobbitObjSet ene_entities[ENE_MAX_OBJS];
+
 int main(int argc, char **argv)
 {    
     if (argc != 2) {
@@ -98,6 +102,7 @@ int main(int argc, char **argv)
         die("don't know what to do with this file.");
     }
 
+    // TODO: do the file reads through SDL
     FILE *fd = fopen(path, "r");
     fseek(fd, 0, SEEK_END);
     size_t filesize = ftell(fd);
@@ -108,16 +113,6 @@ int main(int argc, char **argv)
 
     Ear *ear = ear_decode(buffer, 0);
     ear_print(&ear->nodes[0], print_content);
-    DatFile parsed = {0};
-
-    switch (filetype) {
-    case FILE_TYPE_LVL_DAT:
-        aloha_parse_dat(&parsed, ear->nodes);
-        break;
-        
-    default:
-        die("this file is not supported yet.");
-    }
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
     SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE 
@@ -126,8 +121,25 @@ int main(int argc, char **argv)
     window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
     create_app(window);
 
+    switch (filetype) {
+    case FILE_TYPE_LVL_DAT:
+        aloha_parse_dat(&dat_file, ear->nodes);
+        break;
+    
+    case FILE_TYPE_LVL_ENE:
+        aloha_parse_ene(&ene_file, ear->nodes);
+        for (int i = 0; i < ene_file.nobjs; i++) {
+            printf("converting %d\n", i);
+            convert_objset(&ene_entities[i], &ene_file.objs[i]);
+        }
+        break;
+    
+    default:
+        die("this file is not supported yet.");
+    }
+
     RobbitLevel level = {0};
-    convert_level(&level, &parsed.levels[0]);
+    convert_level(&level, &dat_file.levels[0]);
 
     VertexAttr vert_attrs[] = {
         { offsetof(RobbitVertex, pos),      VK_FORMAT_R16G16B16_SNORM },

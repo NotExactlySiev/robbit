@@ -155,6 +155,7 @@ typedef struct {
 
 // aloha.c
 void aloha_parse_dat(DatFile *out, EarNode *node);
+void aloha_parse_ene(EneFile *out, EarNode *node);
 
 // mesh.c
 void convert_objset(RobbitObjSet *set, AlohaObjSet *src);

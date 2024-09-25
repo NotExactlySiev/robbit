@@ -28,14 +28,8 @@ extern VkCommandPool cmdpool;
 
 extern u32 min_image_count;
 
-//#include "../vulkan/vulkan.h"
 #include "../exact/archive.h"
-/*
-u32 mesh_file_count(const u8 *data);
-u32 mesh_file_parse(const u8 *data, AlohaMesh *out);
-void mesh_render(SDL_Renderer *rend, AlohaMesh *mesh, u16 *clut, SDL_Texture*);
-void save_to_file(const char* path, EarNode* node);
-*/
+const char *get_content_string(EarNode *node);
 }
 
 using namespace ImGui;
@@ -173,20 +167,11 @@ void ui_ear_tree(EarNode *node)
         case EAR_NODE_TYPE_DIR:
             TableNextColumn();
             open = TreeNodeEx((void*)p, ImGuiTreeNodeFlags_SpanFullWidth, "%s", node_get_string(p).c_str());
-            TableNextColumn(); ImGui::TextDisabled("--");
-            TableNextColumn(); //Text("%s", content_strings[aloha(p)->content]);
-            Text("Nothing");
+            TableNextColumn(); TextDisabled("--");
+            TableNextColumn(); //Text("%s", get_content_string(p));
             if (open) {
                 ui_ear_tree(p);
                 TreePop();
-                /*
-                if (aloha(p)->content == EAR_CONTENT_ENTITY) {
-                    if (aloha(p)->viewer == NULL) {
-                        aloha(p)->viewer = new ModelViewer(p);
-                    }
-                    aloha(p)->viewer->show_window();
-                }
-                */
             }
             break;
         case EAR_NODE_TYPE_FILE:
@@ -213,8 +198,7 @@ void ui_ear_tree(EarNode *node)
                 */
             }
             TableNextColumn(); Text("%d", p->size);
-            //TableNextColumn(); Text("%s", content_strings[aloha(p)->content]);
-            TableNextColumn();
+            TableNextColumn(); Text("%s", get_content_string(p));
             break;
         case EAR_NODE_TYPE_SEPARATOR:
             TableNextColumn(); SeparatorText("---");
@@ -297,7 +281,7 @@ bool show_demo = false;
 void main_window(EarNode *ear)
 {
     ZoneScoped;
-    Begin("Bruh");
+    Begin("Archive Explorer");
     //if (ImGui::Button("Save As..."))
     //    ear_save_to_file("savedas.ear", ear);
 
@@ -321,6 +305,27 @@ void main_window(EarNode *ear)
     End();
 }
 
+bool info_overlay_open = true;
+
+void info_overlay()
+{
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+    const float PAD = 8.5f;
+    ImVec2 work_pos = GetMainViewport()->WorkPos;
+    ImVec2 window_pos, window_pos_pivot;
+    window_pos.x = work_pos.x + PAD;
+    window_pos.y = work_pos.y + PAD;
+    window_pos_pivot.x = 0.0f;
+    window_pos_pivot.y = 0.0f;
+    SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
+    SetNextWindowBgAlpha(0.6f);
+    if (Begin("Info Panel", &info_overlay_open, window_flags)) {
+        Text("Simple overlay\n" "nothing is here yet.");
+        Separator();
+    }
+    End();
+}
+
 extern "C"
 void ui_run(EarNode *ear, VkCommandBuffer cbuf, VkPipeline pipe)
 {
@@ -331,11 +336,9 @@ void ui_run(EarNode *ear, VkCommandBuffer cbuf, VkPipeline pipe)
         NewFrame();
     }
 
-
-    // main window
     main_window(ear);
+    info_overlay();
     
-    // demo window
     if (show_demo) {
         ZoneScoped;
         ShowDemoWindow();

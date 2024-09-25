@@ -64,6 +64,14 @@ void push_const(VkCommandBuffer cbuf, Pipeline *pipe, PushConst p)
     );
 }
 
+const char *get_content_string(EarNode *node)
+{
+    if (node->type == EAR_NODE_TYPE_FILE)
+        return content_strings[guess_content_base(node)];
+    else
+        return "";
+}
+
 void print_content(EarNode *node)
 {
     if (node->type == EAR_NODE_TYPE_FILE)
@@ -72,6 +80,8 @@ void print_content(EarNode *node)
 
 DatFile dat_file;
 EneFile ene_file;
+
+RobbitLevel level;
 RobbitObjSet ene_entities[ENE_MAX_OBJS];
 
 int main(int argc, char **argv)
@@ -124,12 +134,12 @@ int main(int argc, char **argv)
     switch (filetype) {
     case FILE_TYPE_LVL_DAT:
         aloha_parse_dat(&dat_file, ear->nodes);
+        convert_level(&level, &dat_file.levels[0]);
         break;
     
     case FILE_TYPE_LVL_ENE:
         aloha_parse_ene(&ene_file, ear->nodes);
         for (int i = 0; i < ene_file.nobjs; i++) {
-            printf("converting %d\n", i);
             convert_objset(&ene_entities[i], &ene_file.objs[i]);
         }
         break;
@@ -137,9 +147,6 @@ int main(int argc, char **argv)
     default:
         die("this file is not supported yet.");
     }
-
-    RobbitLevel level = {0};
-    convert_level(&level, &dat_file.levels[0]);
 
     VertexAttr vert_attrs[] = {
         { offsetof(RobbitVertex, pos),      VK_FORMAT_R16G16B16_SNORM },

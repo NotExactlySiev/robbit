@@ -136,9 +136,10 @@ static void set_prim(RobbitVertex *verts,
     AlohaVertex v2,
     _Color color,
     bool tex, u8 texid,
-    u16 tu0, u16 tv0,
-    u16 tu1, u16 tv1,
-    u16 tu2, u16 tv2)
+    u8 tu0, u8 tv0,
+    u8 tu1, u8 tv1,
+    u8 tu2, u8 tv2,
+    u32 x, u32 y)
 {
     verts[0].pos = v0;
     verts[1].pos = v1;
@@ -146,9 +147,11 @@ static void set_prim(RobbitVertex *verts,
     verts[0].tex = tex;
     if (tex) {
         verts[0].texid = texid;
+        verts[0].x = x; verts[0].y = y;
         verts[0].u = tu0; verts[0].v = tv0;
         verts[1].u = tu1; verts[1].v = tv1;
         verts[2].u = tu2; verts[2].v = tv2;
+
     } else {
         verts[0].col = color;
     }
@@ -213,10 +216,12 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
             //bool lit = !(f->flags0 & 0x0001);
             u8 texid;
             // 16 bits so we don't overflow
-            u16 tu0 = f->tu0, tv0 = f->tv0;
-            u16 tu1 = f->tu1, tv1 = f->tv1;
-            u16 tu2 = f->tu2, tv2 = f->tv2;
-            u16 tu3 = f->tu3, tv3 = f->tv3;
+            u8 tu0 = f->tu0, tv0 = f->tv0;
+            u8 tu1 = f->tu1, tv1 = f->tv1;
+            u8 tu2 = f->tu2, tv2 = f->tv2;
+            u8 tu3 = f->tu3, tv3 = f->tv3;
+            u32 x = 0;
+            u32 y = 0;
             _Color color = color_15_to_24(clut_data[f->flags0 >> 2]);
 
             if (tex) {
@@ -228,8 +233,8 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                 if (tw != 0xE2000000) {
                     u32 xmask = (tw >> 0) & 0x1F;
                     u32 ymask = (tw >> 5) & 0x1F;
-                    u32 x = ((tw >> 10) & 0x1F) << 3;
-                    u32 y = ((tw >> 15) & 0x1F) << 3;
+                    x = ((tw >> 10) & 0x1F) << 3;
+                    y = ((tw >> 15) & 0x1F) << 3;
                     u32 w = ((~(xmask << 3)) + 1) & 0xFF;
                     u32 h = ((~(ymask << 3)) + 1) & 0xFF;
                     // I'm pretty sure this is correct...
@@ -249,21 +254,21 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                         reps[key] = ntex++;
                     }
                     texid = reps[key];
-                    u32 xf = set->texture.images[page].w / w;
-                    u32 yf = set->texture.images[page].h / h;
-                    tu0 *= xf; tv0 *= yf;
-                    tu1 *= xf; tv1 *= yf;
-                    tu2 *= xf; tv2 *= yf;
-                    tu3 *= xf; tv3 *= yf;
+                    //u32 xf = set->texture.images[page].w / w;
+                    //u32 yf = set->texture.images[page].h / h;
+                    //tu0 *= xf; tv0 *= yf;
+                    //tu1 *= xf; tv1 *= yf;
+                    //tu2 *= xf; tv2 *= yf;
+                    //tu3 *= xf; tv3 *= yf;
                 }
             }
 
             set_prim(vkverts[nprims++], v0, v1, v2, color,
-                     tex, texid, tu0, tv0, tu1, tv1, tu2, tv2);
+                     tex, texid, tu0, tv0, tu1, tv1, tu2, tv2, x, y);
 
             if (f->v3 != 0) {
                 set_prim(vkverts[nprims++], v0, v2, v3, color,
-                     tex, texid, tu0, tv0, tu2, tv2, tu3, tv3);
+                     tex, texid, tu0, tv0, tu2, tv2, tu3, tv3, x, y);
             }
         }
 

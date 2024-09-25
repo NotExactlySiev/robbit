@@ -107,7 +107,7 @@ again:
         .clearValueCount = 2,
         .pClearValues = (VkClearValue[])  {
             { .color = { .float32 = { 0.1f, 0.15f, 0.1f, 0.0f } } },
-            { .depthStencil = { .depth = 0.0f } },
+            { .depthStencil = { .depth = 1.0f } },
         },
     }, VK_SUBPASS_CONTENTS_INLINE);
     return curr->cbuf;

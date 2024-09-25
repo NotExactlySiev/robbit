@@ -63,7 +63,8 @@ typedef struct {
     AlohaVertex pos;
     NormalVec normal;
     u8 tex, texid;
-    u16 u, v;
+    u8 u, v;
+    u32 x, y;
     _Color col;
 } RobbitVertex;
 

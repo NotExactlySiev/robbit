@@ -5,11 +5,15 @@ layout(location = 1) in vec4 vertColor;
 layout(location = 2) in vec3 normal;
 layout(location = 3) in uvec2 texData;
 layout(location = 4) in vec2 texCoord;
+layout(location = 5) in ivec2 texOffset;
+
 
 layout(location = 0) out flat vec3 fragColor;
 layout(location = 1) out flat uint isTextured;
 layout(location = 2) out flat uint textureID;
 layout(location = 3) out vec2 fragTexCoord;
+layout(location = 4) out flat ivec2 fragTexOffset;
+
 
 
 layout(set = 0, binding = 0) uniform UB {
@@ -28,25 +32,60 @@ void main()
     textureID = texData[1];
 
     // TODO: move matrix generation to the application
+
+    // write the matrices the way you normally do, just multiply in the other direction
+
+    mat4 squeeze = mat4(
+        1.0,    0.0,    0.0,    0.0,
+        0.0,    1.0,    0.0,    0.0,
+        0.0,    0.0,    0.5,    0.5,
+        0.0,    0.0,    0.0,    1.0
+    );
+
+    mat4 tranmat = mat4(
+        1.0,    0.0,    0.0,    trans.x,
+        0.0,    1.0,    0.0,    trans.y,
+        0.0,    0.0,    1.0,    trans.z,
+        0.0,    0.0,    0.0,    1.0
+    );
+
+    float s = zoom * zoom;
+    mat4 scale = mat4(
+        s,      0.0,    0.0,    0.0,
+        0.0,    s,      0.0,    0.0,
+        0.0,    0.0,    1.0,      0.0,
+        0.0,    0.0,    0.0,    1.0
+    );
+
+    mat4 ratiom = mat4(
+        ratio,  0.0,    0.0,    0.0,
+        0.0,    1.0,    0.0,    0.0,
+        0.0,    0.0,    1.0,    0.0,
+        0.0,    0.0,    0.0,    1.0
+    );
+
     float a = 0.1 * angle;
-    mat3 rot = mat3(
-        cos(a), 0., -sin(a),
-        0., 1., 0.,
-        sin(a), 0., cos(a)
+    mat4 rot = mat4(
+        cos(a), 0.0,    sin(a), 0.0,
+        0.0,    1.0,    0.0,    0.0,
+        -sin(a),0.0,    cos(a), 0.0,
+        0.0,    0.0,    0.0,    1.0
     );
 
-    float b = radians(-21.);
-    mat3 rot2 = mat3(
-        1., 0., 0.,
-        0., cos(b), sin(b),
-        0., -sin(b), cos(b)
+    float b = radians(21.);
+    mat4 rot2 = mat4(
+        1.0,    0.0,    0.0,    0.0,
+        0.0,    cos(b), -sin(b),0.0,
+        0.0,    sin(b), cos(b), 0.0,
+        0.0,    0.0,    0.0,    1.0
     );
 
-    gl_Position = vec4(rot2*rot*(position+trans), 1.0);
-    gl_Position.xy *= zoom * zoom;
-    gl_Position.x *= -ratio;
-    gl_Position.z *= 0.15;
-    gl_Position.z += 0.4;
-    fragTexCoord = texCoord*256.0;
+    mat4 matr = (tranmat) * (rot * rot2) * (scale * ratiom * squeeze);
+    gl_Position = vec4(position, 1.0) * matr;
+    fragTexCoord = texCoord;
+    fragTexCoord.x *= 1.0;
+    fragTexCoord.y *= 4.0;
+    fragTexOffset = texOffset;
+    
     fragColor = vertColor.rgb;
 }

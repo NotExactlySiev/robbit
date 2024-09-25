@@ -180,4 +180,17 @@ void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
         draw_mesh(cbuf, &level->objs.lod[0][obj->id]);
         UNZONE(LevelObject)
     }
+
+    for (int i = 0; i < level->stage.ent.n; i++) {
+        RobbitEntity *e = &level->stage.ent.ents[i];
+        ZONE(LevelEntity)
+        push_const(cbuf, pipe, (PushConst) {
+            .x = ((float) e->x) / INT16_MAX,
+            .y = ((float) e->y) / INT16_MAX,
+            .z = ((float) e->z) / INT16_MAX,
+        });
+        draw_mesh(cbuf, &level->objs.lod[0][63]);
+        UNZONE(LevelEntity)
+
+    }
 }

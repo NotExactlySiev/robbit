@@ -254,7 +254,6 @@ int main(int argc, char **argv)
         writes[2].pImageInfo = image_infos;
         
         for (int i = 0; i < MAX_TEXTURES; i++) {    // TODO: from n
-            //if (textures[i].)
             image_infos[i] = (VkDescriptorImageInfo) {
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .imageView = textures[i].view,

@@ -160,8 +160,40 @@ void convert_level(RobbitLevel *dst, AlohaLevel *src)
     convert_stage(&dst->stage, &src->stage);
 }
 
+static RobbitVertex ground[6] = {
+    
+    { .pos = {  INT16_MAX, 1, -INT16_MAX }, .col = 0x7FF0, .u = 255, .v = 0 },
+    { .pos = {  INT16_MAX, 1,  INT16_MAX }, .col = 0x7FF0, .u = 255, .v = 255 },
+    { .pos = { -INT16_MAX, 1, -INT16_MAX }, .col = 0x7FF0, .u = 0, .v = 0 },
+
+    { .pos = { -INT16_MAX, 1, -INT16_MAX }, .col = 0x7FF0, .u = 0, .v = 0 },
+    { .pos = {  INT16_MAX, 1,  INT16_MAX }, .col = 0x7FF0, .u = 255, .v = 255 },
+    { .pos = { -INT16_MAX, 1,  INT16_MAX }, .col = 0x7FF0, .u = 0, .v = 255 },
+};
+
 void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
 {
+    static bool ground_set = false;
+    static Buffer ground_verts; 
+    
+    if (!ground_set) {
+        // this is just horrible
+        for (int i = 0; i < 6; i++) {
+            ground[i].tex = true;
+            ground[i].texid = 0;
+            ground[i].texwin = (Rect8) { 0, 0, 256, 256 };
+        }
+
+        ground_verts = create_buffer(sizeof(ground), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        buffer_write(ground_verts, sizeof(ground), ground);
+        ground_set = true;
+    }
+
+    push_const(cbuf, pipe, (PushConst) { 0, 0, 0 });
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cbuf, 0, 1, &ground_verts.vk, &offset);
+    vkCmdDraw(cbuf, 6, 1, 0, 0);
+
     for (int i = 0; i < level->stage.geom_hi.n; i++) {
         LoDetailObj *obj = &level->stage.geom_hi.objs[i];
         if (level->objs.lod[0][obj->id].empty) continue;

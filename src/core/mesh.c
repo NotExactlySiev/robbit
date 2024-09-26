@@ -139,7 +139,7 @@ static void set_prim(RobbitVertex *verts,
     u8 tu0, u8 tv0,
     u8 tu1, u8 tv1,
     u8 tu2, u8 tv2,
-    u32 x, u32 y)
+    u16 x, u16 y, u16 w, u16 h)
 {
     verts[0].pos = v0;
     verts[1].pos = v1;
@@ -147,17 +147,18 @@ static void set_prim(RobbitVertex *verts,
     verts[0].tex = tex;
     if (tex) {
         verts[0].texid = texid;
-        verts[0].x = x; verts[0].y = y;
+        verts[0].texwin = (Rect8) { x, y, w, h };
         verts[0].u = tu0; verts[0].v = tv0;
         verts[1].u = tu1; verts[1].v = tv1;
         verts[2].u = tu2; verts[2].v = tv2;
-
     } else {
         verts[0].col = color;
     }
 }
 
 // TODO: right now this only converts one of the sets. normal or lod
+// TODO: now that texture window is handled in the shader, we can break this
+//       function apart a bit.
 void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
 {
     u8 ntex = 0;
@@ -179,8 +180,6 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
         set->texture.views[ntex] = view;
         ntex += 1;
     }
-
-    u8 reps[1 << 21] = {0};
     
     u16 *clut_data = src->clut_node->buf;
     
@@ -220,8 +219,10 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
             u8 tu1 = f->tu1, tv1 = f->tv1;
             u8 tu2 = f->tu2, tv2 = f->tv2;
             u8 tu3 = f->tu3, tv3 = f->tv3;
-            u32 x = 0;
-            u32 y = 0;
+            u16 x = 0;
+            u16 y = 0;
+            u16 w = 256;
+            u16 h = 256;
             _Color color = color_15_to_24(clut_data[f->flags0 >> 2]);
 
             if (tex) {
@@ -235,40 +236,21 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
                     u32 ymask = (tw >> 5) & 0x1F;
                     x = ((tw >> 10) & 0x1F) << 3;
                     y = ((tw >> 15) & 0x1F) << 3;
-                    u32 w = ((~(xmask << 3)) + 1) & 0xFF;
-                    u32 h = ((~(ymask << 3)) + 1) & 0xFF;
+                    w = ((~(xmask << 3)) + 1) & 0xFF;
+                    h = ((~(ymask << 3)) + 1) & 0xFF;
                     // I'm pretty sure this is correct...
                     assert(w != 0 || h != 0);
-                    w = w ?: set->texture.images[page].w;
-                    h = h ?: set->texture.images[page].h;
-
-                    u32 key = (tw & 0xFFFFF) | (page << 20);
-                    if (reps[key] == 0) {
-                        //printf("PAGE %d ", page);
-                        //printf("REP %d\t%d\t%d\t%d\n", x, y, w, h);
-                        Image subimg = extract_tile(&set->texture.images[page], x, y, w, h);
-                        VkImageView view = image_create_view(subimg, VK_IMAGE_ASPECT_COLOR_BIT);
-                        set->texture.images[ntex] = subimg;
-                        set->texture.views[ntex] = view;
-
-                        reps[key] = ntex++;
-                    }
-                    texid = reps[key];
-                    //u32 xf = set->texture.images[page].w / w;
-                    //u32 yf = set->texture.images[page].h / h;
-                    //tu0 *= xf; tv0 *= yf;
-                    //tu1 *= xf; tv1 *= yf;
-                    //tu2 *= xf; tv2 *= yf;
-                    //tu3 *= xf; tv3 *= yf;
+                    //w = w ?: set->texture.images[page].w;
+                    //h = h ?: set->texture.images[page].h;
                 }
             }
 
             set_prim(vkverts[nprims++], v0, v1, v2, color,
-                     tex, texid, tu0, tv0, tu1, tv1, tu2, tv2, x, y);
+                     tex, texid, tu0, tv0, tu1, tv1, tu2, tv2, x, y, w, h);
 
             if (f->v3 != 0) {
                 set_prim(vkverts[nprims++], v0, v2, v3, color,
-                     tex, texid, tu0, tv0, tu2, tv2, tu3, tv3, x, y);
+                     tex, texid, tu0, tv0, tu2, tv2, tu3, tv3, x, y, w, h);
             }
         }
 

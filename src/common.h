@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_TEXTURES    64
+#define MAX_TEXTURES    2
 
 static inline void die(const char *msg)
 {

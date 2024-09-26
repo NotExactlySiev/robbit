@@ -154,7 +154,7 @@ int main(int argc, char **argv)
         { offsetof(RobbitVertex, normal),   VK_FORMAT_R16G16B16_UNORM },
         { offsetof(RobbitVertex, tex),      VK_FORMAT_R8G8_UINT },
         { offsetof(RobbitVertex, u),        VK_FORMAT_R8G8_UNORM },
-        { offsetof(RobbitVertex, x),        VK_FORMAT_R32G32_UINT },
+        { offsetof(RobbitVertex, texwin),   VK_FORMAT_R16G16B16A16_UNORM },
     };
     int nattrs = sizeof(vert_attrs)/sizeof(*vert_attrs);
     Pipeline pipe = create_pipeline(sizeof(RobbitVertex), vert_attrs, nattrs);

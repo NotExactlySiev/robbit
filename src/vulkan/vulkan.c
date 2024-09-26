@@ -98,7 +98,7 @@ void create_app(SDL_Window *window)
             },
             {
                 .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                .descriptorCount = 256,
+                .descriptorCount = 16,
             },
         },
     }, NULL, &descpool);

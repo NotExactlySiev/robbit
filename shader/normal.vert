@@ -5,15 +5,15 @@ layout(location = 1) in vec4 vertColor;
 layout(location = 2) in vec3 normal;
 layout(location = 3) in uvec2 texData;
 layout(location = 4) in vec2 texCoord;
-layout(location = 5) in ivec2 texOffset;
+layout(location = 5) in vec4 texWindow;
 
 
 layout(location = 0) out flat vec3 fragColor;
 layout(location = 1) out flat uint isTextured;
 layout(location = 2) out flat uint textureID;
 layout(location = 3) out vec2 fragTexCoord;
-layout(location = 4) out flat ivec2 fragTexOffset;
-
+layout(location = 4) out flat vec2 fragTexOffset;
+layout(location = 5) out flat vec2 fragTexSize;
 
 
 layout(set = 0, binding = 0) uniform UB {
@@ -30,7 +30,9 @@ void main()
 {
     isTextured = texData[0];
     textureID = texData[1];
-
+    //texWindow *= 256.0;
+    fragTexOffset = 256.0 * texWindow.xy;
+    fragTexSize = 256.0 * texWindow.zw;
     // TODO: move matrix generation to the application
 
     // write the matrices the way you normally do, just multiply in the other direction
@@ -53,7 +55,7 @@ void main()
     mat4 scale = mat4(
         s,      0.0,    0.0,    0.0,
         0.0,    s,      0.0,    0.0,
-        0.0,    0.0,    1.0,      0.0,
+        0.0,    0.0,    1.0,    0.0,
         0.0,    0.0,    0.0,    1.0
     );
 
@@ -83,9 +85,5 @@ void main()
     mat4 matr = (tranmat) * (rot * rot2) * (scale * ratiom * squeeze);
     gl_Position = vec4(position, 1.0) * matr;
     fragTexCoord = texCoord;
-    fragTexCoord.x *= 1.0;
-    fragTexCoord.y *= 4.0;
-    fragTexOffset = texOffset;
-    
     fragColor = vertColor.rgb;
 }

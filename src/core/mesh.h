@@ -60,11 +60,15 @@ typedef struct {
 } NormalVec;
 
 typedef struct {
+    u16 x, y, w, h;
+} Rect8;
+
+typedef struct {
     AlohaVertex pos;
     NormalVec normal;
     u8 tex, texid;
     u8 u, v;
-    u32 x, y;
+    Rect8 texwin;
     _Color col;
 } RobbitVertex;
 

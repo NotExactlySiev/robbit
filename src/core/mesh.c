@@ -134,7 +134,7 @@ static void set_prim(RobbitVertex *verts,
     AlohaVertex v0,
     AlohaVertex v1,
     AlohaVertex v2,
-    _Color color,
+    Color color,
     bool tex, u8 texid,
     u8 tu0, u8 tv0,
     u8 tu1, u8 tv1,
@@ -223,7 +223,7 @@ void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
             u16 y = 0;
             u16 w = 256;
             u16 h = 256;
-            _Color color = color_15_to_24(clut_data[f->flags0 >> 2]);
+            Color color = color_15_to_24(clut_data[f->flags0 >> 2]);
 
             if (tex) {
                 u32 tw = f->texwindow;

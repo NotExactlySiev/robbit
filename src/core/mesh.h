@@ -69,7 +69,7 @@ typedef struct {
     u8 tex, texid;
     u8 u, v;
     Rect8 texwin;
-    _Color col;
+    Color col;
 } RobbitVertex;
 
 #endif

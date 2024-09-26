@@ -114,42 +114,6 @@ void destroy_app(void)
     vkDestroyInstance(inst, NULL);
 }
 
-Image extract_tile(Image *img, u32 x, u32 y, u32 w, u32 h)
-{
-    VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    Image ret = create_image(w, h, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR, flags);
-
-    image_set_layout(img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    image_set_layout(&ret, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-    VkCommandBuffer cb = begin_tmp_cmdbuf();
-    vkCmdCopyImage(cb, 
-        img->vk, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 
-        ret.vk, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-        1, (VkImageCopy[]) {
-            {
-                .srcOffset = { x, y, 0 },
-                .dstOffset = { 0, 0, 0 },
-                .srcSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .layerCount = 1,
-                },
-                .dstSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .layerCount = 1,
-                },
-                .extent = { w, h, 1 },
-            }
-        }
-    );
-    end_tmp_cmdbuf(cb);
-
-    image_set_layout(&ret, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    image_set_layout(img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    return ret;
-}
-
 // basic binary semaphore
 VkSemaphore create_semaphore(void)
 {

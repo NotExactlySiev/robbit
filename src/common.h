@@ -50,11 +50,11 @@ static inline u32 u32le(void *_p)
 
 typedef struct {
     u8 r, g, b;
-} _Color;
+} Color;
 
-static inline _Color color_15_to_24(u16 col)
+static inline Color color_15_to_24(u16 col)
 {
-    return (_Color) {
+    return (Color) {
         .r = (0x1f & (col >> 0)) << 3,
         .g = (0x1f & (col >> 5)) << 3,
         .b = (0x1f & (col >> 10)) << 3,

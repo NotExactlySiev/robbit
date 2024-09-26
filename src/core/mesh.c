@@ -121,7 +121,9 @@ static int extract_faces(AlohaFace *dst, RobbitMesh *mesh)
 
 void draw_mesh(VkCommandBuffer cbuf, RobbitMesh *mesh)
 {
-    assert(mesh->vert_buffer.vk != VK_NULL_HANDLE);
+    //assert(mesh->vert_buffer.vk != VK_NULL_HANDLE);
+    // TODO: is this a bug in my program or the maps?
+    if (mesh->vert_buffer.vk == VK_NULL_HANDLE) return;
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cbuf, 0, 1, &mesh->vert_buffer.vk, &offset);
     vkCmdDraw(cbuf, mesh->vert_count, 1, 0, 0);

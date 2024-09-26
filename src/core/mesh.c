@@ -156,117 +156,101 @@ static void set_prim(RobbitVertex *verts,
     }
 }
 
-// TODO: right now this only converts one of the sets. normal or lod
-// TODO: now that texture window is handled in the shader, we can break this
-//       function apart a bit.
-void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
+// TODO: this should go in a new module for textures
+void convert_texture(RobbitTexture *dst, AlohaTexture *src)
 {
-    u8 ntex = 0;
-    // first do the main images (if they exist)
-    if (src->tex[0].bitmap_node) {
-        Image img = to_vulkan_image(&src->tex[0]);
-        image_set_layout(&img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkImageView view = image_create_view(img, VK_IMAGE_ASPECT_COLOR_BIT);
-        set->texture.images[ntex] = img;
-        set->texture.views[ntex] = view;
-        ntex += 1;
+    dst->image = to_vulkan_image(src);   // unwrap this function here
+    image_set_layout(&dst->image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    dst->view = image_create_view(dst->image, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+void process_mesh(RobbitMesh *mesh, u16 *clut)
+{
+    int nfaces = extract_faces(NULL, mesh);
+    AlohaFace faces[nfaces];
+    extract_faces(faces, mesh);
+
+    int nprims = 0;
+    RobbitVertex vkverts[2048][3];
+
+    for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
+        AlohaVertex v0 = mesh->verts[f->v0];
+        AlohaVertex v1 = mesh->verts[f->v1];
+        AlohaVertex v2 = mesh->verts[f->v2];
+        AlohaVertex v3 = mesh->verts[f->v3];
+        // TODO: take out these magic flags
+        bool tex = !(f->flags1 & 0x8000);
+        //bool lit = !(f->flags0 & 0x0001);
+        u8 texid;
+        // 16 bits so we don't overflow
+        u8 tu0 = f->tu0, tv0 = f->tv0;
+        u8 tu1 = f->tu1, tv1 = f->tv1;
+        u8 tu2 = f->tu2, tv2 = f->tv2;
+        u8 tu3 = f->tu3, tv3 = f->tv3;
+        u16 x = 0;
+        u16 y = 0;
+        u16 w = 256;
+        u16 h = 256;
+        Color color = color_15_to_24(clut[f->flags0 >> 2]);
+
+        if (tex) {
+            u32 tw = f->texwindow;
+            int page = (f->flags0 & 0x4) >> 2;
+
+            texid = page;
+            // TODO: this test is not adequate, false positives
+            if (tw != 0xE2000000) {
+                u32 xmask = (tw >> 0) & 0x1F;
+                u32 ymask = (tw >> 5) & 0x1F;
+                x = ((tw >> 10) & 0x1F) << 3;
+                y = ((tw >> 15) & 0x1F) << 3;
+                w = ((~(xmask << 3)) + 1) & 0xFF;
+                h = ((~(ymask << 3)) + 1) & 0xFF;
+                // I'm pretty sure this is correct...
+                assert(w != 0 || h != 0);
+                //w = w ?: set->texture.images[page].w;
+                //h = h ?: set->texture.images[page].h;
+            }
+        }
+
+        set_prim(vkverts[nprims++], v0, v1, v2, color,
+                 tex, texid, tu0, tv0, tu1, tv1, tu2, tv2, x, y, w, h);
+
+        if (f->v3 != 0)
+            set_prim(vkverts[nprims++], v0, v2, v3, color,
+                     tex, texid, tu0, tv0, tu2, tv2, tu3, tv3, x, y, w, h);
     }
 
-    if (src->tex[1].bitmap_node) {
-        Image img = to_vulkan_image(&src->tex[1]);
-        image_set_layout(&img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkImageView view = image_create_view(img, VK_IMAGE_ASPECT_COLOR_BIT);
-        set->texture.images[ntex] = img;
-        set->texture.views[ntex] = view;
-        ntex += 1;
-    }
-    
+    assert(nprims < 2048);
+    assert(nprims > 0);
+    mesh->vert_count = 3 * nprims;
+    int vert_size = mesh->vert_count * sizeof(RobbitVertex);
+    Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    assert(vert_buf.vk != VK_NULL_HANDLE);
+    buffer_write(vert_buf, vert_size, vkverts);
+    mesh->vert_buffer = vert_buf;
+}
+
+// TODO: right now this only converts one of the sets. normal or lod
+void convert_objset(RobbitObjSet *set, AlohaObjSet *src)
+{
+    if (src->tex[0].bitmap_node)
+        convert_texture(&set->texture[0], &src->tex[0]);
+    if (src->tex[1].bitmap_node)
+        convert_texture(&set->texture[1], &src->tex[1]);
+
     u16 *clut_data = src->clut_node->buf;
-    
+
     set->nlod = 0;
     for (int i = 0; i < OBJSET_MAX_MESH; i++) {
         if (src->mesh_nodes[i] == NULL) break;
         set->nlod += 1;
         parse_file(src->mesh_nodes[i]->buf, set->lod[i]);
-    }
-    
-    for (int i = 0; i < 128; i++) {
-        /*RobbitMesh *m;
-        for (int j = 0; j < set->nlod; j++) {
-            m = &set->lod[j][i];
-            if (!m->empty) break;
-        }*/
-        RobbitMesh *m = &set->lod[0][i];
-        if (m->empty) continue;
-        int nfaces = extract_faces(NULL, m);
-        AlohaFace faces[nfaces];
-        extract_faces(faces, m);
-        
-        int nprims = 0;
-        RobbitVertex vkverts[2048][3];
-
-        for (AlohaFace *f = &faces[0]; f < &faces[nfaces]; f++) {
-            AlohaVertex v0 = m->verts[f->v0];
-            AlohaVertex v1 = m->verts[f->v1];
-            AlohaVertex v2 = m->verts[f->v2];
-            AlohaVertex v3 = m->verts[f->v3];
-            // TODO: take out these magic flags
-            bool tex = !(f->flags1 & 0x8000);
-            //bool lit = !(f->flags0 & 0x0001);
-            u8 texid;
-            // 16 bits so we don't overflow
-            u8 tu0 = f->tu0, tv0 = f->tv0;
-            u8 tu1 = f->tu1, tv1 = f->tv1;
-            u8 tu2 = f->tu2, tv2 = f->tv2;
-            u8 tu3 = f->tu3, tv3 = f->tv3;
-            u16 x = 0;
-            u16 y = 0;
-            u16 w = 256;
-            u16 h = 256;
-            Color color = color_15_to_24(clut_data[f->flags0 >> 2]);
-
-            if (tex) {
-                u32 tw = f->texwindow;
-                int page = (f->flags0 & 0x4) >> 2;
-
-                texid = page;
-                // TODO: this test is not adequate, false positives
-                if (tw != 0xE2000000) {
-                    u32 xmask = (tw >> 0) & 0x1F;
-                    u32 ymask = (tw >> 5) & 0x1F;
-                    x = ((tw >> 10) & 0x1F) << 3;
-                    y = ((tw >> 15) & 0x1F) << 3;
-                    w = ((~(xmask << 3)) + 1) & 0xFF;
-                    h = ((~(ymask << 3)) + 1) & 0xFF;
-                    // I'm pretty sure this is correct...
-                    assert(w != 0 || h != 0);
-                    //w = w ?: set->texture.images[page].w;
-                    //h = h ?: set->texture.images[page].h;
-                }
-            }
-
-            set_prim(vkverts[nprims++], v0, v1, v2, color,
-                     tex, texid, tu0, tv0, tu1, tv1, tu2, tv2, x, y, w, h);
-
-            if (f->v3 != 0) {
-                set_prim(vkverts[nprims++], v0, v2, v3, color,
-                     tex, texid, tu0, tv0, tu2, tv2, tu3, tv3, x, y, w, h);
-            }
+        for (RobbitMesh *p = &set->lod[i][0]; p < &set->lod[i][128]; p++) {
+            if (!p->empty)
+                process_mesh(p, clut_data);
         }
-
-        assert(nprims < 2048);
-        assert(nprims > 0);
-
-        m->vert_count = 3 * nprims;
-        int vert_size = m->vert_count * sizeof(RobbitVertex);
-        Buffer vert_buf = create_buffer(vert_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        assert(vert_buf.vk != VK_NULL_HANDLE);
-        buffer_write(vert_buf, vert_size, vkverts);
-        
-        m->vert_buffer = vert_buf;
     }
-
-    set->texture.n = ntex;
 }
 
 void destroy_objset(RobbitObjSet *set)
@@ -281,9 +265,9 @@ void destroy_objset(RobbitObjSet *set)
         destroy_buffer(set->lod[1][i].vert_buffer);
     }
 
-    for (int i = 0; i < set->texture.n; i++) {
-        vkDestroyImageView(ldev, set->texture.views[i], NULL);
-        destroy_image(set->texture.images[i]);
+    for (int i = 0; i < MAX_TEXTURES; i++) {    // TODO: use n
+        vkDestroyImageView(ldev, set->texture[i].view, NULL);
+        destroy_image(set->texture[i].image);
     }
 }
 

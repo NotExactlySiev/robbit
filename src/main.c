@@ -36,8 +36,8 @@ Image to_vulkan_image(AlohaTexture *src)
     void *bitmap = src->bitmap_node->buf;
     u16 *clut = src->clut_node->buf;
     u8 *p = bitmap;
-    u16 w = (p[4] << 8) | (p[5]);
-    u16 h = (p[6] << 8) | (p[7]);
+    u16 w = u16be(p + 4);
+    u16 h = u16be(p + 6);
     u8 *indices = bitmap + 8;
 
     u16 pixels[w*h];
@@ -81,21 +81,27 @@ void print_content(EarNode *node)
 DatFile dat_file;
 EneFile ene_file;
 
+bool level_loaded = false;
+bool entities_loaded = false;
+
 RobbitLevel level;
 RobbitObjSet ene_entities[ENE_MAX_OBJS];
 
 int main(int argc, char **argv)
-{    
+{
     if (argc != 2) {
         printf(USAGE);
         return -1;
     }
-
+#ifdef TRACY_ENABLE
+    //while (!TracyCIsConnected);
+#endif
     TracyCSetThreadName("my own real thread");
     
+    ZONE(ReadingFile)
     char *path = argv[1];
     char *filename = basename(path);
-    size_t namelen = strlen(filename); 
+    size_t namelen = strlen(filename);
     if (namelen != 11 && namelen != 12)
         die("don't know what to do with this file.");
 
@@ -120,21 +126,28 @@ int main(int argc, char **argv)
     fseek(fd, 0, SEEK_SET);
     assert(fread(buffer, 1, filesize, fd) == filesize);
     fclose(fd);
+    UNZONE(ReadingFile)
 
+    ZONE(DecodingArchive)
     Ear *ear = ear_decode(buffer, 0);
+    UNZONE(DecodingArchive)
     ear_print(&ear->nodes[0], print_content);
 
+    ZONE(InitVulkan)
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
     SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE 
                           | SDL_WINDOW_ALLOW_HIGHDPI
                           | SDL_WINDOW_VULKAN;
     window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
     create_app(window);
+    UNZONE(InitVulkan)
 
+    ZONE(Converting)
     switch (filetype) {
     case FILE_TYPE_LVL_DAT:
         aloha_parse_dat(&dat_file, ear->nodes);
         convert_level(&level, &dat_file.levels[0]);
+        level_loaded = true;
         break;
     
     case FILE_TYPE_LVL_ENE:
@@ -142,11 +155,13 @@ int main(int argc, char **argv)
         for (int i = 0; i < ene_file.nobjs; i++) {
             convert_objset(&ene_entities[i], &ene_file.objs[i]);
         }
+        entities_loaded = true;
         break;
     
     default:
         die("this file is not supported yet.");
     }
+    UNZONE(Converting)
 
     VertexAttr vert_attrs[] = {
         { offsetof(RobbitVertex, pos),      VK_FORMAT_R16G16B16_SNORM },
@@ -231,17 +246,18 @@ int main(int argc, char **argv)
                 .dstBinding = 2,
                 .dstArrayElement = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                .descriptorCount = textures->n,
+                .descriptorCount = MAX_TEXTURES,    // TODO: from n
             },
         };
 
-        VkDescriptorImageInfo image_infos[textures->n];
+        VkDescriptorImageInfo image_infos[MAX_TEXTURES];
         writes[2].pImageInfo = image_infos;
         
-        for (int i = 0; i < textures->n; i++) {
+        for (int i = 0; i < MAX_TEXTURES; i++) {    // TODO: from n
+            //if (textures[i].)
             image_infos[i] = (VkDescriptorImageInfo) {
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .imageView = textures->views[i],
+                .imageView = textures[i].view,
                 .sampler = VK_NULL_HANDLE,
             };
         }
@@ -336,11 +352,31 @@ int main(int argc, char **argv)
         ZONE(Main)
         switch (view_mode) {
         case 0:
-            draw_level(cbuf, &pipe, &level);
-            break;
+            if (level_loaded) {
+                draw_level(cbuf, &pipe, &level);
+                break;
+            } else {
+                view_mode += 1;
+            }
         case 1:
-            push_const(cbuf, &pipe, (PushConst) { 0, 0, 0 });
-            draw_mesh(cbuf, &level.objs.lod[0][mesh_id]);
+            if (level_loaded) {
+                push_const(cbuf, &pipe, (PushConst) { 0, 0, 0 });
+                draw_mesh(cbuf, &level.objs.lod[0][mesh_id]);
+                break;
+            } else {
+                view_mode += 1;
+            }
+        case 2:
+            if (entities_loaded) {
+                push_const(cbuf, &pipe, (PushConst) { 0, 0, 0 });
+                draw_mesh(cbuf, &ene_entities[0].lod[0][mesh_id]);
+                break;
+            } else {
+                view_mode += 1;
+            }
+        
+        case 3:
+            // show message saying nothing is loaded
         }
         UNZONE(Main)
 

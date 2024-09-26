@@ -92,10 +92,8 @@ typedef struct {
 // those get converted into these:
 
 typedef struct {
-    // holds the Image and all the possibly required subiamges
-    uint n;
-    Image images[MAX_TEXTURES];
-    VkImageView views[MAX_TEXTURES];
+    Image image;
+    VkImageView view;
 } RobbitTexture;
 
 typedef struct {
@@ -145,7 +143,7 @@ typedef struct {
     RobbitMesh lod[128];*/
     int nlod;
     RobbitMesh lod[OBJSET_MAX_MESH][128];
-    RobbitTexture texture;
+    RobbitTexture texture[MAX_TEXTURES];
 } RobbitObjSet;
 
 typedef struct {

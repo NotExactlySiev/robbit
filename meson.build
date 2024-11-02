@@ -19,12 +19,12 @@ shaders = [
 
 objcopy = find_program('objcopy')
 glslang = find_program('glslangValidator')
-spirv_opt = find_program('spirv-opt')
-spirv_remap = find_program('spirv-remap')
+#spirv_opt = find_program('spirv-opt')
+#spirv_remap = find_program('spirv-remap')
 
 objcopy_command = [objcopy, '--input', 'binary', '--output', 'elf64-x86-64', '@PLAINNAME@.spv', '@OUTPUT@']
 glslang_command = [glslang, '-V'] + ['-o', '@PLAINNAME@.spv', '@INPUT@', '--depfile', '@PLAINNAME@.deps']
-spirv_opt_command = [spirv_opt, '-Os', '@PLAINNAME@.spv', '-o', '@PLAINNAME@.spv']
+#spirv_opt_command = [spirv_opt, '-Os', '@PLAINNAME@.spv', '-o', '@PLAINNAME@.spv']
 #spirv_remap_command = get_option('buildtype').startswith('debug') ? [] : [spirv_remap, '-s', '-o', '.', '-i', '@PLAINNAME@.spv']
 
 shaders_c = []
@@ -48,6 +48,7 @@ sdl2_dep = dependency('SDL2')
 vulkan_dep = dependency('vulkan', static: true)
 tracy_dep = dependency('tracy', static: true)
 imgui_dep = dependency('imgui', static: true)
+
 
 if get_option('tracy_enable')
   # you have to do this manually. the tracy docs lied to me :(

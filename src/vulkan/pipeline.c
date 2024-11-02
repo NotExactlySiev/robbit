@@ -260,6 +260,154 @@ Pipeline create_pipeline(u32 stride, VertexAttr *attrs, int nattrs)
     return ret;
 }
 
+// ok, let's see what differences there are
+/*
+Pipeline create_pipeline_ground(u32 stride, VertexAttr *attrs, int nattrs)
+{
+    Pipeline ret = {0};
+    
+    default_renderpass = create_basic_renderpass();
+
+    // this can just be reused, good
+    VkVertexInputAttributeDescription attr_descs[nattrs];
+    for (int i = 0; i < nattrs; i++) {
+        attr_descs[i].location = i;
+        attr_descs[i].binding = 0;
+        attr_descs[i].format = attrs[i].format;
+        attr_descs[i].offset = attrs[i].offset;
+    }
+
+    VkPipelineVertexInputStateCreateInfo input_state_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &(VkVertexInputBindingDescription) {
+            .binding = 0,
+            .stride = stride,
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+        },
+        .vertexAttributeDescriptionCount = nattrs,
+        .pVertexAttributeDescriptions = attr_descs,
+    };
+
+    // I want a strip
+    VkPipelineInputAssemblyStateCreateInfo input_asm_info = {
+	    .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+	    .primitiveRestartEnable = VK_FALSE,
+    };
+
+    // same stuff
+    VkPipelineViewportStateCreateInfo viewport_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .pViewports = &(VkViewport) {
+            .x = 0.0,
+            .y = 0.0,
+            .width = surface.cap.currentExtent.width,
+            .height = surface.cap.currentExtent.height,
+            .minDepth = 0.0,
+            .maxDepth = 1.0,
+        },
+        .scissorCount = 1,
+        .pScissors = &(VkRect2D) {
+            .extent = surface.cap.currentExtent,
+        }
+    };
+
+    // different fragment shader?
+    ret.vert_shader = create_shader_module("normal.vert.spv");
+    ret.frag_shader = create_shader_module("normal.frag.spv");
+
+    const VkPipelineShaderStageCreateInfo shader_stages[2] = {
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
+            .module = ret.vert_shader,
+            .pName = "main",
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .module = ret.frag_shader,
+            .pName = "main",
+        }
+    };
+
+    // only one texture etc
+    vkCreateDescriptorSetLayout(ldev, &(VkDescriptorSetLayoutCreateInfo) {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 3,
+        .pBindings = (VkDescriptorSetLayoutBinding[]) {
+            {
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            },
+            {
+                .binding = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            },
+            {
+                .binding = 2,
+                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                .descriptorCount = MAX_TEXTURES,
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            },
+        },
+    }, NULL, &ret.set);
+
+    // and don't need push constants for it
+    VkPipelineLayoutCreateInfo pipeline_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = 1,
+        .pSetLayouts = &ret.set,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = (VkPushConstantRange[]) {
+            {
+                .offset = 0,
+                .size = sizeof(PushConst),
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            }
+        }
+    };
+    vkCreatePipelineLayout(ldev, &pipeline_layout_info, NULL, &ret.layout);
+
+    vkCreateGraphicsPipelines(ldev, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo) {
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .stageCount = 2,
+        .pStages = shader_stages,
+        .pVertexInputState = &input_state_info,
+        .pInputAssemblyState = &input_asm_info,
+        .pViewportState = &viewport_info,
+        .pRasterizationState = &default_raster_info,
+        .pMultisampleState = &default_multisample_info,
+        .pColorBlendState = &default_colorblend_info,
+        .pDepthStencilState = &(VkPipelineDepthStencilStateCreateInfo) {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .depthTestEnable = VK_TRUE,
+            .depthWriteEnable = VK_TRUE,
+            .depthCompareOp = VK_COMPARE_OP_LESS,
+        },
+        .layout = ret.layout,
+        .renderPass = default_renderpass,
+        .basePipelineHandle = VK_NULL_HANDLE,
+        .basePipelineIndex = -1,
+        .pDynamicState = &(VkPipelineDynamicStateCreateInfo) {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = 2,
+            .pDynamicStates = (VkDynamicState[]) {
+                VK_DYNAMIC_STATE_VIEWPORT,
+                VK_DYNAMIC_STATE_SCISSOR,
+            },
+        },
+    }, NULL, &ret.vk);
+
+    return ret;
+}
+*/
 void destroy_pipeline(Pipeline pipe)
 {
     vkDestroyDescriptorSetLayout(ldev, pipe.set, NULL);
@@ -269,3 +417,5 @@ void destroy_pipeline(Pipeline pipe)
     vkDestroyShaderModule(ldev, pipe.vert_shader, NULL);
     vkDestroyShaderModule(ldev, pipe.frag_shader, NULL);
 }
+
+// build up

@@ -146,7 +146,6 @@ void convert_entities(RobbitEntities *dst, EarNode *src)
 void convert_stage(RobbitStage *dst, AlohaStage *src)
 {
     // TODO: other parts
-    // section 0
     convert_entities(&dst->ent, src->entities_node);
     convert_geom_hi(&dst->geom_hi, &src->geom_hi);
     convert_geom_lo(&dst->geom_lo, &src->geom_lo);
@@ -174,7 +173,7 @@ static RobbitVertex ground[6] = {
 void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
 {
     static bool ground_set = false;
-    static Buffer ground_verts; 
+    static Buffer ground_verts;
     
     if (!ground_set) {
         // this is just horrible
@@ -194,6 +193,7 @@ void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
     vkCmdBindVertexBuffers(cbuf, 0, 1, &ground_verts.vk, &offset);
     vkCmdDraw(cbuf, 6, 1, 0, 0);
 
+    int total_tri_count = 0;
     for (int i = 0; i < level->stage.geom_hi.n; i++) {
         LoDetailObj *obj = &level->stage.geom_hi.objs[i];
         if (level->objs.lod[0][obj->id].empty) continue;
@@ -209,9 +209,11 @@ void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
                 break;
             }
         }*/
+        total_tri_count += level->objs.lod[0][obj->id].vert_count / 3;
         draw_mesh(cbuf, &level->objs.lod[0][obj->id]);
         UNZONE(LevelObject)
     }
+    printf("%d tris\n", total_tri_count);
 
     for (int i = 0; i < level->stage.ent.n; i++) {
         RobbitEntity *e = &level->stage.ent.ents[i];

@@ -70,12 +70,10 @@ void create_app(SDL_Window *window)
 
     ldev = create_vulkan_device(inst, surface.vk, &pdev, &queue_family);
     
-    // ok we got a window and a vk instance jesus fuck.
-    // and get access to the queue
     vkGetDeviceQueue(ldev, queue_family, 0, &queue);
 
     swapchain = create_swapchain();
-    // command pool and command buffer from the queue
+    
     VkCommandPoolCreateInfo command_pool_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,

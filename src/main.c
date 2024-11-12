@@ -100,6 +100,23 @@ int main(int argc, char **argv)
     
     ZONE(ReadingFile)
     char *path = argv[1];
+    
+    // TODO: do the file reads through SDL
+    FILE *fd = fopen(path, "r");
+    fseek(fd, 0, SEEK_END);
+    size_t filesize = ftell(fd);
+    u8 *buffer = malloc(filesize);
+    fseek(fd, 0, SEEK_SET);
+    assert(fread(buffer, 1, filesize, fd) == filesize);
+    fclose(fd);
+    UNZONE(ReadingFile)
+
+    ZONE(DecodingArchive)
+    Ear *ear = ear_decode(buffer, 0);
+    UNZONE(DecodingArchive)
+    ear_print(&ear->nodes[0], print_content);
+
+    // what do we do with it?
     char *filename = basename(path);
     size_t namelen = strlen(filename);
     if (namelen != 11 && namelen != 12)
@@ -117,30 +134,6 @@ int main(int argc, char **argv)
     } else {
         die("don't know what to do with this file.");
     }
-
-    // TODO: do the file reads through SDL
-    FILE *fd = fopen(path, "r");
-    fseek(fd, 0, SEEK_END);
-    size_t filesize = ftell(fd);
-    u8 *buffer = malloc(filesize);
-    fseek(fd, 0, SEEK_SET);
-    assert(fread(buffer, 1, filesize, fd) == filesize);
-    fclose(fd);
-    UNZONE(ReadingFile)
-
-    ZONE(DecodingArchive)
-    Ear *ear = ear_decode(buffer, 0);
-    UNZONE(DecodingArchive)
-    ear_print(&ear->nodes[0], print_content);
-
-    ZONE(InitVulkan)
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
-    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE 
-                          | SDL_WINDOW_ALLOW_HIGHDPI
-                          | SDL_WINDOW_VULKAN;
-    window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
-    create_app(window);
-    UNZONE(InitVulkan)
 
     ZONE(Converting)
     switch (filetype) {
@@ -162,6 +155,15 @@ int main(int argc, char **argv)
         die("this file is not supported yet.");
     }
     UNZONE(Converting)
+
+    ZONE(InitVulkan)
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE 
+                          | SDL_WINDOW_ALLOW_HIGHDPI
+                          | SDL_WINDOW_VULKAN;
+    window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
+    create_app(window);
+    UNZONE(InitVulkan)
 
     VertexAttr vert_attrs[] = {
         { offsetof(RobbitVertex, pos),      VK_FORMAT_R16G16B16_SNORM },

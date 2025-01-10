@@ -29,10 +29,9 @@ int find_first_offset(void *data, int offset_size)
     }
 }
 
-// section 1
 typedef struct {
     u16 count;
-    LoDetailObj objs[];
+    HiDetailObj objs[];
 } OtherBlock;
 
 static int geom_hi_count(void *data)
@@ -49,7 +48,7 @@ static int geom_hi_count(void *data)
     return ret;
 }
 
-static void geom_hi_unpack(void *data, LoDetailObj *out)
+static void geom_hi_unpack(void *data, HiDetailObj *out)
 {
     int n = 0;
     u32 *chunks = data;
@@ -64,6 +63,7 @@ static void geom_hi_unpack(void *data, LoDetailObj *out)
     }
 }
 
+/*
 // for section 2 (geom) only. TODO: take out common code with other sections
 static int geom_lo_count(void *data)
 {
@@ -79,11 +79,11 @@ static int geom_lo_count(void *data)
     return ret;
 }
 
-static void geom_lo_unpack(void *data, HiDetailObj *out)
+static void geom_lo_unpack(void *data, LoDetailObj *out)
 {
     typedef struct {
         u16 count;
-        HiDetailObj objs[];
+        LoDetailObj objs[];
     } ObjBlock;
 
     int n = 0;
@@ -98,21 +98,23 @@ static void geom_lo_unpack(void *data, HiDetailObj *out)
         }
     }
 }
+*/
 
-void convert_geom_hi(RobbitGeomLo *dst, AlohaGeomHi *src)
-{
-    int nobjs = geom_hi_count(src->node->buf);
-    assert(nobjs <= STAGE_MAX_GEOM);
-    dst->n = nobjs;
-    geom_hi_unpack(src->node->buf, dst->objs);
-}
-
-void convert_geom_lo(RobbitGeomHi *dst, AlohaGeomLo *src)
+/*
+void convert_geom_lo(RobbitGeomLo *dst, AlohaGeomLo *src)
 {
     int nobjs = geom_lo_count(src->node->buf);
     assert(nobjs <= STAGE_MAX_GEOM);
     dst->n = nobjs;
     geom_lo_unpack(src->node->buf, dst->objs);
+}
+*/
+void convert_geom_hi(RobbitGeomHi *dst, AlohaGeomHi *src)
+{
+    int nobjs = geom_hi_count(src->node->buf);
+    assert(nobjs <= STAGE_MAX_GEOM);
+    dst->n = nobjs;
+    geom_hi_unpack(src->node->buf, dst->objs);
 }
 
 void destroy_level(RobbitLevel *level)
@@ -135,7 +137,7 @@ void convert_entities(RobbitEntities *dst, EarNode *src)
         u32 off = chunks[i];
         if (off == 0) continue;
         u16 count = *(u16*)(p + off);
-        RobbitEntity *e = p + off + 2;
+        RobbitEntity *e = (RobbitEntity *)(p + off + 2);
         for (int j = 0; j < count; j++) {
             dst->ents[n++] = e[j];
         }
@@ -147,8 +149,8 @@ void convert_stage(RobbitStage *dst, AlohaStage *src)
 {
     // TODO: other parts
     convert_entities(&dst->ent, src->entities_node);
+    //convert_geom_lo(&dst->geom_lo, &src->geom_lo);
     convert_geom_hi(&dst->geom_hi, &src->geom_hi);
-    convert_geom_lo(&dst->geom_lo, &src->geom_lo);
     // section 3
     // section 4 (?)
 }
@@ -163,7 +165,8 @@ void draw_level(VkCommandBuffer cbuf, Pipeline *pipe, RobbitLevel *level)
 {
     int total_tri_count = 0;
     for (int i = 0; i < level->stage.geom_hi.n; i++) {
-        LoDetailObj *obj = &level->stage.geom_hi.objs[i];
+        //LoDetailObj *obj = &level->stage.geom_hi.objs[i];
+        HiDetailObj *obj = &level->stage.geom_hi.objs[i];
         if (level->objs.lod[0][obj->id].empty) continue;
         ZONE(LevelObject)
         push_const(cbuf, pipe, (PushConst) {

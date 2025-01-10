@@ -45,7 +45,9 @@ Image to_vulkan_image(AlohaTexture *src)
         pixels[i] = clut[indices[i]];
     }
 
-    VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT
+                            | VK_IMAGE_USAGE_SAMPLED_BIT
+                            | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     Image ret = create_image(w, h, VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR, flags);
     image_write(&ret, pixels);
@@ -86,6 +88,11 @@ bool entities_loaded = false;
 
 RobbitLevel level;
 RobbitObjSet ene_entities[ENE_MAX_OBJS];
+
+void ui_init(void);
+void ui_process_event(SDL_Event *e);
+void ui_kill(void);
+void ui_run();
 
 int main(int argc, char **argv)
 {
@@ -135,6 +142,21 @@ int main(int argc, char **argv)
         die("don't know what to do with this file.");
     }
 
+    ZONE(InitVulkan)
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE 
+                          | SDL_WINDOW_ALLOW_HIGHDPI
+                          | SDL_WINDOW_VULKAN;
+    window = SDL_CreateWindow(
+        "Robbit",
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        1280, 720,
+        flags
+    );
+    create_app(window);
+    UNZONE(InitVulkan)
+
     ZONE(Converting)
     switch (filetype) {
     case FILE_TYPE_LVL_DAT:
@@ -156,14 +178,7 @@ int main(int argc, char **argv)
     }
     UNZONE(Converting)
 
-    ZONE(InitVulkan)
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER);
-    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE 
-                          | SDL_WINDOW_ALLOW_HIGHDPI
-                          | SDL_WINDOW_VULKAN;
-    window = SDL_CreateWindow("Robbit", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, flags);
-    create_app(window);
-    UNZONE(InitVulkan)
+
 
     VertexAttr vert_attrs[] = {
         { offsetof(RobbitVertex, pos),      VK_FORMAT_R16G16B16_SNORM },
@@ -211,7 +226,7 @@ int main(int argc, char **argv)
         uniform_buffers[i] = create_buffer(sizeof(Uniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkMapMemory(ldev, uniform_buffers[i].mem, 0, sizeof(Uniform), 0, (void**) &uniforms[i]);
 
-        RobbitTexture *textures = &level.objs.texture;
+        RobbitTexture *textures = level.objs.texture;
 
         VkWriteDescriptorSet writes[3] = {
             {

@@ -64,8 +64,8 @@ typedef struct {
 typedef struct {
     EarNode *node;
     EarNode *entities_node;
-    AlohaGeomHi geom_hi;
     AlohaGeomLo geom_lo;
+    AlohaGeomHi geom_hi;
     //
     //
 } AlohaStage;
@@ -99,12 +99,12 @@ typedef struct {
 typedef struct {
     u16 id;
     i16 x, y, z;
-} HiDetailObj;
+} LoDetailObj;
 
 typedef struct {
     i16 x, y, z;
     u16 id;
-} LoDetailObj;
+} HiDetailObj;
 
 typedef struct {
     uint n;

@@ -17,7 +17,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update -y
-          sudo apt install -y meson ninja-build glslang-dev glslang-tools libvulkan-dev vulkan-tools
+          sudo apt install -y meson ninja-build glslang-dev glslang-tools libvulkan-dev vulkan-tools libstb-dev libsdl2-dev
       - run: |
           meson setup build
           cd build

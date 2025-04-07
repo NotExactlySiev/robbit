@@ -16,7 +16,8 @@ jobs:
           set-safe-directory: true
       - name: Install Dependencies
         run: |
-          sudo apt install -y meson ninja
+          sudo apt update -y
+          sudo apt install -y meson ninja-build
       - run: |
           meson setup build
           cd build

@@ -22,3 +22,6 @@ jobs:
           meson setup build
           cd build
           ninja
+      - run: |
+          export REL_NAME="release-$(date +%Y%m%d%H%M%S)"
+          gh release create $REL_NAME -t "${REL_NAME}" --generate-notes build/robbit
